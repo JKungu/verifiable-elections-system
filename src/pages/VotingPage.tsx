@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Vote, Lock, AlertTriangle, CheckCircle } from 'lucide-react';
-import { useToast } = from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 const VotingPage = () => {
   const { electionId } = useParams<{ electionId: string }>();
