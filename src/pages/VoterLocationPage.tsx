@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { MapPin, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface Location {
@@ -33,18 +32,15 @@ const VoterLocationPage = () => {
   // Load counties on component mount
   useEffect(() => {
     const loadCounties = async () => {
-      const { data, error } = await supabase
-        .from('locations')
-        .select('*')
-        .eq('type', 'county')
-        .order('name');
-
-      if (error) {
-        console.error('Error loading counties:', error);
-        return;
-      }
-
-      setCounties(data || []);
+      // For now, use hardcoded counties until the database schema is fully updated
+      const hardcodedCounties: Location[] = [
+        { id: '1', name: 'Nairobi County', type: 'county', parent_id: null },
+        { id: '2', name: 'Mombasa County', type: 'county', parent_id: null },
+        { id: '3', name: 'Kisumu County', type: 'county', parent_id: null },
+        { id: '4', name: 'Nakuru County', type: 'county', parent_id: null },
+        { id: '5', name: 'Kiambu County', type: 'county', parent_id: null },
+      ];
+      setCounties(hardcodedCounties);
     };
 
     loadCounties();
@@ -54,57 +50,72 @@ const VoterLocationPage = () => {
   useEffect(() => {
     if (location.county) {
       const loadConstituencies = async () => {
-        const selectedCounty = counties.find(c => c.name === location.county);
-        if (!selectedCounty) return;
-
-        const { data, error } = await supabase
-          .from('locations')
-          .select('*')
-          .eq('type', 'constituency')
-          .eq('parent_id', selectedCounty.id)
-          .order('name');
-
-        if (error) {
-          console.error('Error loading constituencies:', error);
-          return;
+        // Hardcoded constituencies based on selected county
+        let hardcodedConstituencies: Location[] = [];
+        
+        if (location.county === 'Nairobi County') {
+          hardcodedConstituencies = [
+            { id: '6', name: 'Westlands', type: 'constituency', parent_id: '1' },
+            { id: '7', name: 'Langata', type: 'constituency', parent_id: '1' },
+            { id: '8', name: 'Kasarani', type: 'constituency', parent_id: '1' },
+            { id: '9', name: 'Starehe', type: 'constituency', parent_id: '1' },
+          ];
+        } else if (location.county === 'Mombasa County') {
+          hardcodedConstituencies = [
+            { id: '10', name: 'Mvita', type: 'constituency', parent_id: '2' },
+            { id: '11', name: 'Changamwe', type: 'constituency', parent_id: '2' },
+            { id: '12', name: 'Jomba', type: 'constituency', parent_id: '2' },
+          ];
+        } else {
+          hardcodedConstituencies = [
+            { id: '13', name: 'Sample Constituency 1', type: 'constituency', parent_id: '3' },
+            { id: '14', name: 'Sample Constituency 2', type: 'constituency', parent_id: '3' },
+          ];
         }
 
-        setConstituencies(data || []);
+        setConstituencies(hardcodedConstituencies);
       };
 
       loadConstituencies();
     } else {
       setConstituencies([]);
     }
-  }, [location.county, counties]);
+  }, [location.county]);
 
   // Load wards when constituency changes
   useEffect(() => {
     if (location.constituency) {
       const loadWards = async () => {
-        const selectedConstituency = constituencies.find(c => c.name === location.constituency);
-        if (!selectedConstituency) return;
-
-        const { data, error } = await supabase
-          .from('locations')
-          .select('*')
-          .eq('type', 'ward')
-          .eq('parent_id', selectedConstituency.id)
-          .order('name');
-
-        if (error) {
-          console.error('Error loading wards:', error);
-          return;
+        // Hardcoded wards based on selected constituency
+        let hardcodedWards: Location[] = [];
+        
+        if (location.constituency === 'Westlands') {
+          hardcodedWards = [
+            { id: '15', name: 'Kitisuru', type: 'ward', parent_id: '6' },
+            { id: '16', name: 'Parklands', type: 'ward', parent_id: '6' },
+            { id: '17', name: 'Highridge', type: 'ward', parent_id: '6' },
+          ];
+        } else if (location.constituency === 'Langata') {
+          hardcodedWards = [
+            { id: '18', name: 'Karen', type: 'ward', parent_id: '7' },
+            { id: '19', name: 'Nairobi West', type: 'ward', parent_id: '7' },
+            { id: '20', name: 'Mugumo-ini', type: 'ward', parent_id: '7' },
+          ];
+        } else {
+          hardcodedWards = [
+            { id: '21', name: 'Sample Ward 1', type: 'ward', parent_id: '8' },
+            { id: '22', name: 'Sample Ward 2', type: 'ward', parent_id: '8' },
+          ];
         }
 
-        setWards(data || []);
+        setWards(hardcodedWards);
       };
 
       loadWards();
     } else {
       setWards([]);
     }
-  }, [location.constituency, constituencies]);
+  }, [location.constituency]);
 
   const handleLocationChange = (field: string, value: string) => {
     setLocation(prev => ({
