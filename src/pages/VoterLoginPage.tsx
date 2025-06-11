@@ -5,16 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Vote, User } from 'lucide-react';
+import { User, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 const VoterLoginPage = () => {
   const [formData, setFormData] = useState({
+    idNumber: '',
     firstName: '',
     lastName: '',
-    idNumber: '',
     phoneNumber: ''
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -31,48 +30,41 @@ const VoterLoginPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formData.idNumber || !formData.firstName || !formData.lastName || !formData.phoneNumber) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Validate all fields are filled
-      if (!formData.firstName || !formData.lastName || !formData.idNumber || !formData.phoneNumber) {
-        toast({
-          title: "Missing Information",
-          description: "Please fill in all required fields.",
-          variant: "destructive",
-        });
-        return;
+      // Simple validation for ID number (should be 8 digits)
+      if (formData.idNumber.length !== 8 || !/^\d+$/.test(formData.idNumber)) {
+        throw new Error('ID number must be exactly 8 digits');
       }
 
-      // Check if voter already exists and has voted
-      const { data: existingVoter, error: checkError } = await supabase
-        .from('voters')
-        .select('*')
-        .eq('id_number', formData.idNumber)
-        .maybeSingle();
+      // For now, we'll just store the voter data in localStorage
+      // The database integration will be handled once the types are updated
+      const voterData = {
+        idNumber: formData.idNumber,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phoneNumber: formData.phoneNumber,
+        loginTime: new Date().toISOString()
+      };
 
-      if (checkError) {
-        throw checkError;
-      }
-
-      if (existingVoter && existingVoter.has_voted) {
-        toast({
-          title: "Already Voted",
-          description: "This ID number has already been used to vote.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Store voter data for the session
-      localStorage.setItem('voterData', JSON.stringify(formData));
+      localStorage.setItem('voterData', JSON.stringify(voterData));
       
       toast({
         title: "Login Successful",
-        description: "Welcome to the voting portal!",
+        description: "Please select your location to continue.",
       });
 
-      // Navigate to location selection
       navigate('/voter-location');
     } catch (error: any) {
       toast({
@@ -95,16 +87,30 @@ const VoterLoginPage = () => {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <div className="bg-blue-600 p-3 rounded-full">
-              <Vote className="h-8 w-8 text-white" />
+              <User className="h-8 w-8 text-white" />
             </div>
           </div>
           <CardTitle className="text-2xl font-bold">Voter Login</CardTitle>
           <CardDescription>
-            Enter your personal information to access the voting portal
+            Enter your details to access the voting system
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="idNumber">National ID Number</Label>
+              <Input
+                id="idNumber"
+                name="idNumber"
+                type="text"
+                placeholder="Enter your 8-digit ID number"
+                value={formData.idNumber}
+                onChange={handleInputChange}
+                maxLength={8}
+                required
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="firstName">First Name</Label>
               <Input
@@ -132,19 +138,6 @@ const VoterLoginPage = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="idNumber">ID Number</Label>
-              <Input
-                id="idNumber"
-                name="idNumber"
-                type="text"
-                placeholder="Enter your ID number"
-                value={formData.idNumber}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="phoneNumber">Phone Number</Label>
               <Input
                 id="phoneNumber"
@@ -159,20 +152,20 @@ const VoterLoginPage = () => {
 
             <Button 
               type="submit" 
-              className="w-full" 
+              className="w-full"
               disabled={isLoading}
             >
-              <User className="h-4 w-4 mr-2" />
-              {isLoading ? 'Verifying...' : 'Login as Voter'}
+              <ArrowRight className="h-4 w-4 mr-2" />
+              {isLoading ? 'Logging in...' : 'Continue to Location Selection'}
             </Button>
 
-            <div className="text-center pt-4">
+            <div className="text-center">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate('/clerk-login')}
+                onClick={() => navigate('/')}
               >
-                Login as Clerk Instead
+                Back to Home
               </Button>
             </div>
           </form>
