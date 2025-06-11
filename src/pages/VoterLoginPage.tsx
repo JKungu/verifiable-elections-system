@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Vote, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const VoterLoginPage = () => {
   const [formData, setFormData] = useState({
@@ -42,7 +44,27 @@ const VoterLoginPage = () => {
         return;
       }
 
-      // Store voter data in localStorage for this demo
+      // Check if voter already exists and has voted
+      const { data: existingVoter, error: checkError } = await supabase
+        .from('voters')
+        .select('*')
+        .eq('id_number', formData.idNumber)
+        .maybeSingle();
+
+      if (checkError) {
+        throw checkError;
+      }
+
+      if (existingVoter && existingVoter.has_voted) {
+        toast({
+          title: "Already Voted",
+          description: "This ID number has already been used to vote.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Store voter data for the session
       localStorage.setItem('voterData', JSON.stringify(formData));
       
       toast({
@@ -52,10 +74,10 @@ const VoterLoginPage = () => {
 
       // Navigate to location selection
       navigate('/voter-location');
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Login Failed",
-        description: "Please check your information and try again.",
+        description: error.message || "Please check your information and try again.",
         variant: "destructive",
       });
     } finally {
@@ -64,7 +86,11 @@ const VoterLoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
+      
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -137,7 +163,7 @@ const VoterLoginPage = () => {
               disabled={isLoading}
             >
               <User className="h-4 w-4 mr-2" />
-              {isLoading ? 'Logging in...' : 'Login as Voter'}
+              {isLoading ? 'Verifying...' : 'Login as Voter'}
             </Button>
 
             <div className="text-center pt-4">
