@@ -10,51 +10,51 @@ import { useToast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { 
   getCounties, 
-  getConstituenciesByCounty, 
-  getWardsByConstituency,
+  getSubcountiesByCounty, 
+  getWardsBySubcounty,
   County,
-  Constituency,
+  Subcounty,
   Ward
 } from '@/data/kenyaLocations';
 
 const VoterLocationPage = () => {
   const [selectedLocation, setSelectedLocation] = useState({
     county: '',
-    constituency: '',
+    subcounty: '',
     ward: ''
   });
   
   const [counties] = useState<County[]>(getCounties());
-  const [constituencies, setConstituencies] = useState<Constituency[]>([]);
+  const [subcounties, setSubcounties] = useState<Subcounty[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Update constituencies when county changes
+  // Update subcounties when county changes
   useEffect(() => {
     if (selectedLocation.county) {
-      const newConstituencies = getConstituenciesByCounty(selectedLocation.county);
-      setConstituencies(newConstituencies);
+      const newSubcounties = getSubcountiesByCounty(selectedLocation.county);
+      setSubcounties(newSubcounties);
       
       // Clear dependent selections
       setSelectedLocation(prev => ({
         ...prev,
-        constituency: '',
+        subcounty: '',
         ward: ''
       }));
       setWards([]);
     } else {
-      setConstituencies([]);
+      setSubcounties([]);
       setWards([]);
     }
   }, [selectedLocation.county]);
 
-  // Update wards when constituency changes
+  // Update wards when subcounty changes
   useEffect(() => {
-    if (selectedLocation.constituency) {
-      const newWards = getWardsByConstituency(selectedLocation.constituency);
+    if (selectedLocation.subcounty) {
+      const newWards = getWardsBySubcounty(selectedLocation.subcounty);
       setWards(newWards);
       
       // Clear ward selection
@@ -65,9 +65,9 @@ const VoterLocationPage = () => {
     } else {
       setWards([]);
     }
-  }, [selectedLocation.constituency]);
+  }, [selectedLocation.subcounty]);
 
-  const handleLocationChange = (field: 'county' | 'constituency' | 'ward', value: string) => {
+  const handleLocationChange = (field: 'county' | 'subcounty' | 'ward', value: string) => {
     setSelectedLocation(prev => ({
       ...prev,
       [field]: value
@@ -75,10 +75,10 @@ const VoterLocationPage = () => {
   };
 
   const handleProceed = async () => {
-    if (!selectedLocation.county || !selectedLocation.constituency || !selectedLocation.ward) {
+    if (!selectedLocation.county || !selectedLocation.subcounty || !selectedLocation.ward) {
       toast({
         title: "Incomplete Selection",
-        description: "Please select your County, Constituency, and Ward.",
+        description: "Please select your County, Subcounty, and Ward.",
         variant: "destructive",
       });
       return;
@@ -89,10 +89,10 @@ const VoterLocationPage = () => {
     try {
       // Get the full location details
       const selectedCounty = counties.find(c => c.id === selectedLocation.county);
-      const selectedConstituency = constituencies.find(c => c.id === selectedLocation.constituency);
+      const selectedSubcounty = subcounties.find(s => s.id === selectedLocation.subcounty);
       const selectedWard = wards.find(w => w.id === selectedLocation.ward);
 
-      if (!selectedCounty || !selectedConstituency || !selectedWard) {
+      if (!selectedCounty || !selectedSubcounty || !selectedWard) {
         throw new Error('Invalid location selection');
       }
 
@@ -103,9 +103,9 @@ const VoterLocationPage = () => {
           name: selectedCounty.name,
           code: selectedCounty.code
         },
-        constituency: {
-          id: selectedConstituency.id,
-          name: selectedConstituency.name
+        subcounty: {
+          id: selectedSubcounty.id,
+          name: selectedSubcounty.name
         },
         ward: {
           id: selectedWard.id,
@@ -117,7 +117,7 @@ const VoterLocationPage = () => {
       
       toast({
         title: "Location Confirmed",
-        description: `Selected: ${selectedWard.name} Ward, ${selectedConstituency.name}, ${selectedCounty.name}`,
+        description: `Selected: ${selectedWard.name} Ward, ${selectedSubcounty.name}, ${selectedCounty.name}`,
       });
 
       navigate('/voter-candidates');
@@ -147,7 +147,7 @@ const VoterLocationPage = () => {
           </div>
           <CardTitle className="text-2xl font-bold">Select Your Location</CardTitle>
           <CardDescription>
-            Choose your County, Constituency, and Ward to view relevant candidates
+            Choose your County, Subcounty, and Ward to view relevant candidates
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -168,23 +168,23 @@ const VoterLocationPage = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="constituency">Constituency</Label>
+            <Label htmlFor="subcounty">Subcounty</Label>
             <Select 
-              value={selectedLocation.constituency} 
-              onValueChange={(value) => handleLocationChange('constituency', value)}
+              value={selectedLocation.subcounty} 
+              onValueChange={(value) => handleLocationChange('subcounty', value)}
               disabled={!selectedLocation.county}
             >
               <SelectTrigger>
                 <SelectValue placeholder={
                   selectedLocation.county 
-                    ? "Select your constituency" 
+                    ? "Select your subcounty" 
                     : "Select a county first"
                 } />
               </SelectTrigger>
               <SelectContent>
-                {constituencies.map((constituency) => (
-                  <SelectItem key={constituency.id} value={constituency.id}>
-                    {constituency.name}
+                {subcounties.map((subcounty) => (
+                  <SelectItem key={subcounty.id} value={subcounty.id}>
+                    {subcounty.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -196,13 +196,13 @@ const VoterLocationPage = () => {
             <Select 
               value={selectedLocation.ward} 
               onValueChange={(value) => handleLocationChange('ward', value)}
-              disabled={!selectedLocation.constituency}
+              disabled={!selectedLocation.subcounty}
             >
               <SelectTrigger>
                 <SelectValue placeholder={
-                  selectedLocation.constituency 
+                  selectedLocation.subcounty 
                     ? "Select your ward" 
-                    : "Select a constituency first"
+                    : "Select a subcounty first"
                 } />
               </SelectTrigger>
               <SelectContent>
@@ -221,8 +221,8 @@ const VoterLocationPage = () => {
               <h4 className="font-semibold text-sm text-blue-900 dark:text-blue-100 mb-2">Selected Location:</h4>
               <div className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
                 <div>County: {counties.find(c => c.id === selectedLocation.county)?.name}</div>
-                {selectedLocation.constituency && (
-                  <div>Constituency: {constituencies.find(c => c.id === selectedLocation.constituency)?.name}</div>
+                {selectedLocation.subcounty && (
+                  <div>Subcounty: {subcounties.find(s => s.id === selectedLocation.subcounty)?.name}</div>
                 )}
                 {selectedLocation.ward && (
                   <div>Ward: {wards.find(w => w.id === selectedLocation.ward)?.name}</div>
@@ -234,7 +234,7 @@ const VoterLocationPage = () => {
           <Button 
             onClick={handleProceed}
             className="w-full"
-            disabled={!selectedLocation.county || !selectedLocation.constituency || !selectedLocation.ward || isLoading}
+            disabled={!selectedLocation.county || !selectedLocation.subcounty || !selectedLocation.ward || isLoading}
           >
             <ArrowRight className="h-4 w-4 mr-2" />
             {isLoading ? 'Processing...' : 'Proceed to Candidate Selection'}

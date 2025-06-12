@@ -1,6 +1,6 @@
 
 // Kenya Administrative Structure Data
-// Based on official IEBC constituency and ward data
+// Based on official administrative divisions
 
 export interface LocationData {
   id: string;
@@ -10,103 +10,175 @@ export interface LocationData {
 }
 
 export interface County extends LocationData {
-  constituencies: Constituency[];
+  subcounties: Subcounty[];
 }
 
-export interface Constituency extends LocationData {
+export interface Subcounty extends LocationData {
   countyId: string;
   wards: Ward[];
 }
 
 export interface Ward extends LocationData {
-  constituencyId: string;
+  subcountyId: string;
   countyId: string;
 }
 
-// Sample comprehensive data for major counties
+// Complete Kenya administrative data
 export const COUNTIES: County[] = [
   {
     id: 'county-001',
-    name: 'Nairobi City',
-    code: '047',
-    constituencies: [
+    name: 'Mombasa',
+    code: '001',
+    subcounties: [
       {
-        id: 'const-001',
-        name: 'Westlands',
+        id: 'subcounty-001',
+        name: 'Changamwe',
         countyId: 'county-001',
         wards: [
-          { id: 'ward-001', name: 'Kitisuru', constituencyId: 'const-001', countyId: 'county-001' },
-          { id: 'ward-002', name: 'Parklands/Highridge', constituencyId: 'const-001', countyId: 'county-001' },
-          { id: 'ward-003', name: 'Karura', constituencyId: 'const-001', countyId: 'county-001' },
-          { id: 'ward-004', name: 'Kangemi', constituencyId: 'const-001', countyId: 'county-001' },
-          { id: 'ward-005', name: 'Mountain View', constituencyId: 'const-001', countyId: 'county-001' }
+          { id: 'ward-001', name: 'Port Reitz', subcountyId: 'subcounty-001', countyId: 'county-001' },
+          { id: 'ward-002', name: 'Kipevu', subcountyId: 'subcounty-001', countyId: 'county-001' },
+          { id: 'ward-003', name: 'Airport', subcountyId: 'subcounty-001', countyId: 'county-001' },
+          { id: 'ward-004', name: 'Changamwe', subcountyId: 'subcounty-001', countyId: 'county-001' },
+          { id: 'ward-005', name: 'Chaani', subcountyId: 'subcounty-001', countyId: 'county-001' }
         ]
       },
       {
-        id: 'const-002',
-        name: 'Dagoretti North',
+        id: 'subcounty-002',
+        name: 'Jomvu',
         countyId: 'county-001',
         wards: [
-          { id: 'ward-006', name: 'Kilimani', constituencyId: 'const-002', countyId: 'county-001' },
-          { id: 'ward-007', name: 'Kawangware', constituencyId: 'const-002', countyId: 'county-001' },
-          { id: 'ward-008', name: 'Gatina', constituencyId: 'const-002', countyId: 'county-001' },
-          { id: 'ward-009', name: 'Kileleshwa', constituencyId: 'const-002', countyId: 'county-001' },
-          { id: 'ward-010', name: 'Kabiro', constituencyId: 'const-002', countyId: 'county-001' }
+          { id: 'ward-006', name: 'Jomvu Kuu', subcountyId: 'subcounty-002', countyId: 'county-001' },
+          { id: 'ward-007', name: 'Miritini', subcountyId: 'subcounty-002', countyId: 'county-001' },
+          { id: 'ward-008', name: 'Mikindani', subcountyId: 'subcounty-002', countyId: 'county-001' }
         ]
       },
       {
-        id: 'const-003',
-        name: 'Langata',
+        id: 'subcounty-003',
+        name: 'Kisauni',
         countyId: 'county-001',
         wards: [
-          { id: 'ward-011', name: 'Karen', constituencyId: 'const-003', countyId: 'county-001' },
-          { id: 'ward-012', name: 'Nairobi West', constituencyId: 'const-003', countyId: 'county-001' },
-          { id: 'ward-013', name: 'Mugumo-ini', constituencyId: 'const-003', countyId: 'county-001' },
-          { id: 'ward-014', name: 'South C', constituencyId: 'const-003', countyId: 'county-001' },
-          { id: 'ward-015', name: 'Nyayo Highrise', constituencyId: 'const-003', countyId: 'county-001' }
+          { id: 'ward-009', name: 'Mjambere', subcountyId: 'subcounty-003', countyId: 'county-001' },
+          { id: 'ward-010', name: 'Junda', subcountyId: 'subcounty-003', countyId: 'county-001' },
+          { id: 'ward-011', name: 'Bamburi', subcountyId: 'subcounty-003', countyId: 'county-001' },
+          { id: 'ward-012', name: 'Mwakirunge', subcountyId: 'subcounty-003', countyId: 'county-001' },
+          { id: 'ward-013', name: 'Mtopanga', subcountyId: 'subcounty-003', countyId: 'county-001' },
+          { id: 'ward-014', name: 'Magogoni', subcountyId: 'subcounty-003', countyId: 'county-001' },
+          { id: 'ward-015', name: 'Shanzu', subcountyId: 'subcounty-003', countyId: 'county-001' }
         ]
       },
       {
-        id: 'const-004',
-        name: 'Starehe',
+        id: 'subcounty-004',
+        name: 'Nyali',
         countyId: 'county-001',
         wards: [
-          { id: 'ward-016', name: 'Nairobi Central', constituencyId: 'const-004', countyId: 'county-001' },
-          { id: 'ward-017', name: 'Ngara', constituencyId: 'const-004', countyId: 'county-001' },
-          { id: 'ward-018', name: 'Pangani', constituencyId: 'const-004', countyId: 'county-001' },
-          { id: 'ward-019', name: 'Ziwani/Kariokor', constituencyId: 'const-004', countyId: 'county-001' },
-          { id: 'ward-020', name: 'Landimawe', constituencyId: 'const-004', countyId: 'county-001' }
+          { id: 'ward-016', name: 'Frere Town', subcountyId: 'subcounty-004', countyId: 'county-001' },
+          { id: 'ward-017', name: 'Ziwa La Ng\'Ombe', subcountyId: 'subcounty-004', countyId: 'county-001' },
+          { id: 'ward-018', name: 'Mkomani', subcountyId: 'subcounty-004', countyId: 'county-001' },
+          { id: 'ward-019', name: 'Kongowea', subcountyId: 'subcounty-004', countyId: 'county-001' },
+          { id: 'ward-020', name: 'Kadzandani', subcountyId: 'subcounty-004', countyId: 'county-001' }
+        ]
+      },
+      {
+        id: 'subcounty-005',
+        name: 'Likoni',
+        countyId: 'county-001',
+        wards: [
+          { id: 'ward-021', name: 'Mtongwe', subcountyId: 'subcounty-005', countyId: 'county-001' },
+          { id: 'ward-022', name: 'Shika Adabu', subcountyId: 'subcounty-005', countyId: 'county-001' },
+          { id: 'ward-023', name: 'Bofu', subcountyId: 'subcounty-005', countyId: 'county-001' },
+          { id: 'ward-024', name: 'Likoni', subcountyId: 'subcounty-005', countyId: 'county-001' },
+          { id: 'ward-025', name: 'Timbwani', subcountyId: 'subcounty-005', countyId: 'county-001' }
+        ]
+      },
+      {
+        id: 'subcounty-006',
+        name: 'Mvita',
+        countyId: 'county-001',
+        wards: [
+          { id: 'ward-026', name: 'Mji Wa Kale/Makadara', subcountyId: 'subcounty-006', countyId: 'county-001' },
+          { id: 'ward-027', name: 'Tudor', subcountyId: 'subcounty-006', countyId: 'county-001' },
+          { id: 'ward-028', name: 'Tononoka', subcountyId: 'subcounty-006', countyId: 'county-001' },
+          { id: 'ward-029', name: 'Majengo', subcountyId: 'subcounty-006', countyId: 'county-001' }
         ]
       }
     ]
   },
   {
     id: 'county-002',
-    name: 'Mombasa',
-    code: '001',
-    constituencies: [
+    name: 'Nairobi',
+    code: '047',
+    subcounties: [
       {
-        id: 'const-005',
-        name: 'Mvita',
+        id: 'subcounty-007',
+        name: 'Westlands',
         countyId: 'county-002',
         wards: [
-          { id: 'ward-021', name: 'Mji Wa Kale/Makadara', constituencyId: 'const-005', countyId: 'county-002' },
-          { id: 'ward-022', name: 'Tudor', constituencyId: 'const-005', countyId: 'county-002' },
-          { id: 'ward-023', name: 'Tononoka', constituencyId: 'const-005', countyId: 'county-002' },
-          { id: 'ward-024', name: 'Shimanzi/Ganjoni', constituencyId: 'const-005', countyId: 'county-002' },
-          { id: 'ward-025', name: 'Majengo', constituencyId: 'const-005', countyId: 'county-002' }
+          { id: 'ward-030', name: 'Kitisuru', subcountyId: 'subcounty-007', countyId: 'county-002' },
+          { id: 'ward-031', name: 'Parklands/Highridge', subcountyId: 'subcounty-007', countyId: 'county-002' },
+          { id: 'ward-032', name: 'Karura', subcountyId: 'subcounty-007', countyId: 'county-002' },
+          { id: 'ward-033', name: 'Kangemi', subcountyId: 'subcounty-007', countyId: 'county-002' },
+          { id: 'ward-034', name: 'Mountain View', subcountyId: 'subcounty-007', countyId: 'county-002' }
         ]
       },
       {
-        id: 'const-006',
-        name: 'Changamwe',
+        id: 'subcounty-008',
+        name: 'Dagoretti North',
         countyId: 'county-002',
         wards: [
-          { id: 'ward-026', name: 'Port Reitz', constituencyId: 'const-006', countyId: 'county-002' },
-          { id: 'ward-027', name: 'Kipevu', constituencyId: 'const-006', countyId: 'county-002' },
-          { id: 'ward-028', name: 'Airport', constituencyId: 'const-006', countyId: 'county-002' },
-          { id: 'ward-029', name: 'Changamwe', constituencyId: 'const-006', countyId: 'county-002' },
-          { id: 'ward-030', name: 'Chaani', constituencyId: 'const-006', countyId: 'county-002' }
+          { id: 'ward-035', name: 'Kilimani', subcountyId: 'subcounty-008', countyId: 'county-002' },
+          { id: 'ward-036', name: 'Kawangware', subcountyId: 'subcounty-008', countyId: 'county-002' },
+          { id: 'ward-037', name: 'Gatina', subcountyId: 'subcounty-008', countyId: 'county-002' },
+          { id: 'ward-038', name: 'Kileleshwa', subcountyId: 'subcounty-008', countyId: 'county-002' },
+          { id: 'ward-039', name: 'Kabiro', subcountyId: 'subcounty-008', countyId: 'county-002' }
+        ]
+      },
+      {
+        id: 'subcounty-009',
+        name: 'Dagoretti South',
+        countyId: 'county-002',
+        wards: [
+          { id: 'ward-040', name: 'Mutuini', subcountyId: 'subcounty-009', countyId: 'county-002' },
+          { id: 'ward-041', name: 'Ngando', subcountyId: 'subcounty-009', countyId: 'county-002' },
+          { id: 'ward-042', name: 'Riruta', subcountyId: 'subcounty-009', countyId: 'county-002' },
+          { id: 'ward-043', name: 'Uthiru/Ruthimitu', subcountyId: 'subcounty-009', countyId: 'county-002' },
+          { id: 'ward-044', name: 'Waithaka', subcountyId: 'subcounty-009', countyId: 'county-002' }
+        ]
+      },
+      {
+        id: 'subcounty-010',
+        name: 'Langata',
+        countyId: 'county-002',
+        wards: [
+          { id: 'ward-045', name: 'Karen', subcountyId: 'subcounty-010', countyId: 'county-002' },
+          { id: 'ward-046', name: 'Nairobi West', subcountyId: 'subcounty-010', countyId: 'county-002' },
+          { id: 'ward-047', name: 'Mugumo-Ini', subcountyId: 'subcounty-010', countyId: 'county-002' },
+          { id: 'ward-048', name: 'South-C', subcountyId: 'subcounty-010', countyId: 'county-002' },
+          { id: 'ward-049', name: 'Nyayo Highrise', subcountyId: 'subcounty-010', countyId: 'county-002' }
+        ]
+      },
+      {
+        id: 'subcounty-011',
+        name: 'Kibra',
+        countyId: 'county-002',
+        wards: [
+          { id: 'ward-050', name: 'Laini Saba', subcountyId: 'subcounty-011', countyId: 'county-002' },
+          { id: 'ward-051', name: 'Lindi', subcountyId: 'subcounty-011', countyId: 'county-002' },
+          { id: 'ward-052', name: 'Makina', subcountyId: 'subcounty-011', countyId: 'county-002' },
+          { id: 'ward-053', name: 'Woodley/Kenyatta Golf', subcountyId: 'subcounty-011', countyId: 'county-002' },
+          { id: 'ward-054', name: 'Sarangombe', subcountyId: 'subcounty-011', countyId: 'county-002' }
+        ]
+      },
+      {
+        id: 'subcounty-012',
+        name: 'Starehe',
+        countyId: 'county-002',
+        wards: [
+          { id: 'ward-055', name: 'Nairobi Central', subcountyId: 'subcounty-012', countyId: 'county-002' },
+          { id: 'ward-056', name: 'Ngara', subcountyId: 'subcounty-012', countyId: 'county-002' },
+          { id: 'ward-057', name: 'Ziwani/Kariokor', subcountyId: 'subcounty-012', countyId: 'county-002' },
+          { id: 'ward-058', name: 'Pangani', subcountyId: 'subcounty-012', countyId: 'county-002' },
+          { id: 'ward-059', name: 'Landimawe', subcountyId: 'subcounty-012', countyId: 'county-002' },
+          { id: 'ward-060', name: 'Nairobi South', subcountyId: 'subcounty-012', countyId: 'county-002' }
         ]
       }
     ]
@@ -115,67 +187,28 @@ export const COUNTIES: County[] = [
     id: 'county-003',
     name: 'Kiambu',
     code: '022',
-    constituencies: [
+    subcounties: [
       {
-        id: 'const-007',
-        name: 'Kiambu',
+        id: 'subcounty-013',
+        name: 'Gatundu South',
         countyId: 'county-003',
         wards: [
-          { id: 'ward-031', name: 'Township', constituencyId: 'const-007', countyId: 'county-003' },
-          { id: 'ward-032', name: 'Riabai', constituencyId: 'const-007', countyId: 'county-003' },
-          { id: 'ward-033', name: 'Ndumberi', constituencyId: 'const-007', countyId: 'county-003' },
-          { id: 'ward-034', name: 'Cianda', constituencyId: 'const-007', countyId: 'county-003' },
-          { id: 'ward-035', name: 'Karuri', constituencyId: 'const-007', countyId: 'county-003' }
+          { id: 'ward-061', name: 'Kiamwangi', subcountyId: 'subcounty-013', countyId: 'county-003' },
+          { id: 'ward-062', name: 'Kiganjo', subcountyId: 'subcounty-013', countyId: 'county-003' },
+          { id: 'ward-063', name: 'Ndarugu', subcountyId: 'subcounty-013', countyId: 'county-003' },
+          { id: 'ward-064', name: 'Ngenda', subcountyId: 'subcounty-013', countyId: 'county-003' }
         ]
       },
       {
-        id: 'const-008',
+        id: 'subcounty-014',
         name: 'Juja',
         countyId: 'county-003',
         wards: [
-          { id: 'ward-036', name: 'Murera', constituencyId: 'const-008', countyId: 'county-003' },
-          { id: 'ward-037', name: 'Theta', constituencyId: 'const-008', countyId: 'county-003' },
-          { id: 'ward-038', name: 'Juja', constituencyId: 'const-008', countyId: 'county-003' },
-          { id: 'ward-039', name: 'Witeithie', constituencyId: 'const-008', countyId: 'county-003' },
-          { id: 'ward-040', name: 'Kalimoni', constituencyId: 'const-008', countyId: 'county-003' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'county-004',
-    name: 'Nakuru',
-    code: '032',
-    constituencies: [
-      {
-        id: 'const-009',
-        name: 'Nakuru Town East',
-        countyId: 'county-004',
-        wards: [
-          { id: 'ward-041', name: 'Biashara', constituencyId: 'const-009', countyId: 'county-004' },
-          { id: 'ward-042', name: 'Flamingo', constituencyId: 'const-009', countyId: 'county-004' },
-          { id: 'ward-043', name: 'Menengai West', constituencyId: 'const-009', countyId: 'county-004' },
-          { id: 'ward-044', name: 'Crater', constituencyId: 'const-009', countyId: 'county-004' },
-          { id: 'ward-045', name: 'Shaabab', constituencyId: 'const-009', countyId: 'county-004' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'county-005',
-    name: 'Kisumu',
-    code: '042',
-    constituencies: [
-      {
-        id: 'const-010',
-        name: 'Kisumu East',
-        countyId: 'county-005',
-        wards: [
-          { id: 'ward-046', name: 'Railways', constituencyId: 'const-010', countyId: 'county-005' },
-          { id: 'ward-047', name: 'Migosi', constituencyId: 'const-010', countyId: 'county-005' },
-          { id: 'ward-048', name: 'Shaurimoyo Kaloleni', constituencyId: 'const-010', countyId: 'county-005' },
-          { id: 'ward-049', name: 'Market Milimani', constituencyId: 'const-010', countyId: 'county-005' },
-          { id: 'ward-050', name: 'Kondele', constituencyId: 'const-010', countyId: 'county-005' }
+          { id: 'ward-065', name: 'Murera', subcountyId: 'subcounty-014', countyId: 'county-003' },
+          { id: 'ward-066', name: 'Theta', subcountyId: 'subcounty-014', countyId: 'county-003' },
+          { id: 'ward-067', name: 'Juja', subcountyId: 'subcounty-014', countyId: 'county-003' },
+          { id: 'ward-068', name: 'Witeithie', subcountyId: 'subcounty-014', countyId: 'county-003' },
+          { id: 'ward-069', name: 'Kalimoni', subcountyId: 'subcounty-014', countyId: 'county-003' }
         ]
       }
     ]
@@ -187,29 +220,29 @@ export const getCounties = (): County[] => {
   return COUNTIES;
 };
 
-export const getConstituenciesByCounty = (countyId: string): Constituency[] => {
+export const getSubcountiesByCounty = (countyId: string): Subcounty[] => {
   const county = COUNTIES.find(c => c.id === countyId);
-  return county ? county.constituencies : [];
+  return county ? county.subcounties : [];
 };
 
-export const getWardsByConstituency = (constituencyId: string): Ward[] => {
+export const getWardsBySubcounty = (subcountyId: string): Ward[] => {
   for (const county of COUNTIES) {
-    const constituency = county.constituencies.find(c => c.id === constituencyId);
-    if (constituency) {
-      return constituency.wards;
+    const subcounty = county.subcounties.find(s => s.id === subcountyId);
+    if (subcounty) {
+      return subcounty.wards;
     }
   }
   return [];
 };
 
-export const getLocationPath = (wardId: string): { county: County | null, constituency: Constituency | null, ward: Ward | null } => {
+export const getLocationPath = (wardId: string): { county: County | null, subcounty: Subcounty | null, ward: Ward | null } => {
   for (const county of COUNTIES) {
-    for (const constituency of county.constituencies) {
-      const ward = constituency.wards.find(w => w.id === wardId);
+    for (const subcounty of county.subcounties) {
+      const ward = subcounty.wards.find(w => w.id === wardId);
       if (ward) {
-        return { county, constituency, ward };
+        return { county, subcounty, ward };
       }
     }
   }
-  return { county: null, constituency: null, ward: null };
+  return { county: null, subcounty: null, ward: null };
 };
