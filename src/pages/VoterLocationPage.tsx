@@ -3,11 +3,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { MapPin, ArrowRight } from 'lucide-react';
+import { MapPin, ArrowRight, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { SearchableSelect } from '@/components/LocationSearch';
 import { 
   getCounties, 
   getSubcountiesByCounty, 
@@ -78,7 +78,7 @@ const VoterLocationPage = () => {
     if (!selectedLocation.county || !selectedLocation.subcounty || !selectedLocation.ward) {
       toast({
         title: "Incomplete Selection",
-        description: "Please select your County, Subcounty, and Ward.",
+        description: "Please select your County, Subcounty, and Ward to continue.",
         variant: "destructive",
       });
       return;
@@ -147,85 +147,92 @@ const VoterLocationPage = () => {
           </div>
           <CardTitle className="text-2xl font-bold">Select Your Location</CardTitle>
           <CardDescription>
-            Choose your County, Subcounty, and Ward to view relevant candidates
+            Choose your County, Subcounty, and Ward to view relevant candidates. Use the search feature to quickly find your location.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="county">County</Label>
-            <Select value={selectedLocation.county} onValueChange={(value) => handleLocationChange('county', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select your county" />
-              </SelectTrigger>
-              <SelectContent>
-                {counties.map((county) => (
-                  <SelectItem key={county.id} value={county.id}>
-                    {county.name} {county.code && `(${county.code})`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="county" className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              County ({counties.length} available)
+            </Label>
+            <SearchableSelect
+              options={counties}
+              value={selectedLocation.county}
+              onValueChange={(value) => handleLocationChange('county', value)}
+              placeholder="Search and select your county"
+              searchPlaceholder="Type to search counties..."
+            />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="subcounty">Subcounty</Label>
-            <Select 
-              value={selectedLocation.subcounty} 
+            <Label htmlFor="subcounty" className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Subcounty ({subcounties.length} available)
+            </Label>
+            <SearchableSelect
+              options={subcounties}
+              value={selectedLocation.subcounty}
               onValueChange={(value) => handleLocationChange('subcounty', value)}
+              placeholder={
+                selectedLocation.county 
+                  ? "Search and select your subcounty" 
+                  : "Select a county first"
+              }
+              searchPlaceholder="Type to search subcounties..."
               disabled={!selectedLocation.county}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={
-                  selectedLocation.county 
-                    ? "Select your subcounty" 
-                    : "Select a county first"
-                } />
-              </SelectTrigger>
-              <SelectContent>
-                {subcounties.map((subcounty) => (
-                  <SelectItem key={subcounty.id} value={subcounty.id}>
-                    {subcounty.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="ward">Ward</Label>
-            <Select 
-              value={selectedLocation.ward} 
+            <Label htmlFor="ward" className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Ward ({wards.length} available)
+            </Label>
+            <SearchableSelect
+              options={wards}
+              value={selectedLocation.ward}
               onValueChange={(value) => handleLocationChange('ward', value)}
+              placeholder={
+                selectedLocation.subcounty 
+                  ? "Search and select your ward" 
+                  : "Select a subcounty first"
+              }
+              searchPlaceholder="Type to search wards..."
               disabled={!selectedLocation.subcounty}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={
-                  selectedLocation.subcounty 
-                    ? "Select your ward" 
-                    : "Select a subcounty first"
-                } />
-              </SelectTrigger>
-              <SelectContent>
-                {wards.map((ward) => (
-                  <SelectItem key={ward.id} value={ward.id}>
-                    {ward.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
+          </div>
+
+          {/* Progress indicator */}
+          <div className="flex justify-center space-x-2">
+            <div className={`h-2 w-8 rounded-full ${selectedLocation.county ? 'bg-blue-600' : 'bg-gray-200'}`} />
+            <div className={`h-2 w-8 rounded-full ${selectedLocation.subcounty ? 'bg-blue-600' : 'bg-gray-200'}`} />
+            <div className={`h-2 w-8 rounded-full ${selectedLocation.ward ? 'bg-blue-600' : 'bg-gray-200'}`} />
           </div>
 
           {/* Location Summary */}
           {selectedLocation.county && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-              <h4 className="font-semibold text-sm text-blue-900 dark:text-blue-100 mb-2">Selected Location:</h4>
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+              <h4 className="font-semibold text-sm text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                Selected Location:
+              </h4>
               <div className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                <div>County: {counties.find(c => c.id === selectedLocation.county)?.name}</div>
+                <div className="flex justify-between">
+                  <span className="font-medium">County:</span>
+                  <span>{counties.find(c => c.id === selectedLocation.county)?.name}</span>
+                </div>
                 {selectedLocation.subcounty && (
-                  <div>Subcounty: {subcounties.find(s => s.id === selectedLocation.subcounty)?.name}</div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Subcounty:</span>
+                    <span>{subcounties.find(s => s.id === selectedLocation.subcounty)?.name}</span>
+                  </div>
                 )}
                 {selectedLocation.ward && (
-                  <div>Ward: {wards.find(w => w.id === selectedLocation.ward)?.name}</div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Ward:</span>
+                    <span>{wards.find(w => w.id === selectedLocation.ward)?.name}</span>
+                  </div>
                 )}
               </div>
             </div>
