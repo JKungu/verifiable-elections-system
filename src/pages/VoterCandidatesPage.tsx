@@ -50,7 +50,7 @@ const VoterCandidatesPage = () => {
           return;
         }
 
-        const { wardId } = JSON.parse(voterLocation);
+        const { ward } = JSON.parse(voterLocation);
 
         // For now, we'll use hardcoded positions until the database schema is updated
         const hardcodedPositions: Position[] = [
@@ -177,6 +177,7 @@ const VoterCandidatesPage = () => {
 
         setCandidates(sampleCandidates);
       } catch (error: any) {
+        console.error('Error loading candidates:', error);
         toast({
           title: "Error",
           description: error.message || "Failed to load candidates.",
@@ -229,13 +230,19 @@ const VoterCandidatesPage = () => {
     setIsSubmitting(true);
 
     try {
-      // Since the new tables aren't in the types yet, we'll use type assertion
+      console.log('Starting vote submission process...');
+      
       // Check if voter already exists
-      const { data: existingVoter } = await (supabase as any)
+      const { data: existingVoter, error: fetchError } = await supabase
         .from('voters')
         .select('*')
         .eq('id_number', voter.idNumber)
-        .single();
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error('Error fetching voter:', fetchError);
+        throw fetchError;
+      }
 
       if (existingVoter?.has_voted) {
         toast({
@@ -247,33 +254,79 @@ const VoterCandidatesPage = () => {
         return;
       }
 
-      // Insert or update voter record
-      const { data: voterRecord, error: voterError } = await (supabase as any)
-        .from('voters')
-        .upsert({
-          id_number: voter.idNumber,
-          first_name: voter.firstName,
-          last_name: voter.lastName,
-          phone_number: voter.phoneNumber,
-          location_id: location.wardId,
-          has_voted: true,
-          voted_at: new Date().toISOString()
-        }, {
-          onConflict: 'id_number'
-        })
-        .select()
-        .single();
+      let voterRecord;
 
-      if (voterError) throw voterError;
+      if (existingVoter) {
+        // Update existing voter record
+        const { data: updatedVoter, error: updateError } = await supabase
+          .from('voters')
+          .update({
+            has_voted: true,
+            voted_at: new Date().toISOString(),
+            location_id: location.ward.id
+          })
+          .eq('id', existingVoter.id)
+          .select()
+          .single();
 
-      // For now, we'll just simulate vote recording since the votes table schema needs to be updated
-      console.log('Votes would be recorded:', {
+        if (updateError) {
+          console.error('Error updating voter:', updateError);
+          throw updateError;
+        }
+        
+        voterRecord = updatedVoter;
+      } else {
+        // Insert new voter record
+        const { data: newVoter, error: insertError } = await supabase
+          .from('voters')
+          .insert({
+            id_number: voter.idNumber,
+            first_name: voter.firstName,
+            last_name: voter.lastName,
+            phone_number: voter.phoneNumber,
+            location_id: location.ward.id,
+            has_voted: true,
+            voted_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('Error inserting voter:', insertError);
+          throw insertError;
+        }
+        
+        voterRecord = newVoter;
+      }
+
+      console.log('Voter record created/updated:', voterRecord);
+
+      // Insert votes for each position
+      const votesToInsert = Object.entries(selectedCandidates).map(([positionId, candidateId]) => ({
         voter_id: voterRecord.id,
-        selected_candidates: selectedCandidates,
-        location: location
+        position_id: positionId,
+        candidate_id: candidateId
+      }));
+
+      console.log('Inserting votes:', votesToInsert);
+
+      const { error: votesError } = await supabase
+        .from('votes')
+        .insert(votesToInsert);
+
+      if (votesError) {
+        console.error('Error inserting votes:', votesError);
+        throw votesError;
+      }
+
+      console.log('Votes submitted successfully');
+      setShowCongratulations(true);
+      
+      toast({
+        title: "Votes Submitted",
+        description: "Your votes have been successfully recorded!",
       });
 
-      setShowCongratulations(true);
     } catch (error: any) {
       console.error('Voting error:', error);
       toast({

@@ -401,6 +401,77 @@ export type Database = {
           },
         ]
       }
+      voters: {
+        Row: {
+          created_at: string
+          first_name: string
+          has_voted: boolean
+          id: string
+          id_number: string
+          last_name: string
+          location_id: string | null
+          phone_number: string | null
+          updated_at: string
+          voted_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          first_name: string
+          has_voted?: boolean
+          id?: string
+          id_number: string
+          last_name: string
+          location_id?: string | null
+          phone_number?: string | null
+          updated_at?: string
+          voted_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          first_name?: string
+          has_voted?: boolean
+          id?: string
+          id_number?: string
+          last_name?: string
+          location_id?: string | null
+          phone_number?: string | null
+          updated_at?: string
+          voted_at?: string | null
+        }
+        Relationships: []
+      }
+      votes: {
+        Row: {
+          candidate_id: string
+          created_at: string
+          id: string
+          position_id: string
+          voter_id: string | null
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string
+          id?: string
+          position_id: string
+          voter_id?: string | null
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string
+          id?: string
+          position_id?: string
+          voter_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "votes_voter_id_fkey"
+            columns: ["voter_id"]
+            isOneToOne: false
+            referencedRelation: "voters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
