@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +22,7 @@ interface Candidate {
     name: string;
     level: string;
   };
+  location_id?: string; // For location-specific candidates
 }
 
 interface Position {
@@ -38,21 +38,23 @@ const VoterCandidatesPage = () => {
   const [showCongratulations, setShowCongratulations] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [voterLocation, setVoterLocation] = useState<any>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
     const loadCandidatesAndPositions = async () => {
       try {
-        const voterLocation = localStorage.getItem('voterLocation');
-        if (!voterLocation) {
+        const voterLocationData = localStorage.getItem('voterLocation');
+        if (!voterLocationData) {
           navigate('/voter-location');
           return;
         }
 
-        const { ward } = JSON.parse(voterLocation);
+        const location = JSON.parse(voterLocationData);
+        setVoterLocation(location);
 
-        // For now, we'll use hardcoded positions until the database schema is updated
+        // Hardcoded positions
         const hardcodedPositions: Position[] = [
           { id: '1', name: 'President', level: 'country' },
           { id: '2', name: 'Governor', level: 'county' },
@@ -63,8 +65,8 @@ const VoterCandidatesPage = () => {
         
         setPositions(hardcodedPositions);
 
-        // Load sample candidates with proper structure
-        const sampleCandidates: Candidate[] = [
+        // Generate location-specific candidates
+        const locationSpecificCandidates: Candidate[] = [
           // Presidential candidates (same for all locations)
           {
             id: '1',
@@ -94,88 +96,136 @@ const VoterCandidatesPage = () => {
             position: { id: '1', name: 'President', level: 'country' }
           },
           
-          // Governor candidates
+          // Governor candidates (specific to county)
           {
-            id: '4',
-            candidate_id: 'GOV001',
-            full_name: 'Peter Mwangi Kariuki',
+            id: `gov-${location.county.id}-1`,
+            candidate_id: `GOV${location.county.code}001`,
+            full_name: `Peter Mwangi Kariuki - ${location.county.name}`,
             name: 'Peter Mwangi',
             party: 'County First',
             image_url: '/placeholder.svg',
-            position: { id: '2', name: 'Governor', level: 'county' }
+            position: { id: '2', name: 'Governor', level: 'county' },
+            location_id: location.county.id
           },
           {
-            id: '5',
-            candidate_id: 'GOV002',
-            full_name: 'Grace Akinyi Omondi',
+            id: `gov-${location.county.id}-2`,
+            candidate_id: `GOV${location.county.code}002`,
+            full_name: `Grace Akinyi Omondi - ${location.county.name}`,
             name: 'Grace Akinyi',
             party: 'Development Party',
             image_url: '/placeholder.svg',
-            position: { id: '2', name: 'Governor', level: 'county' }
+            position: { id: '2', name: 'Governor', level: 'county' },
+            location_id: location.county.id
+          },
+          {
+            id: `gov-${location.county.id}-3`,
+            candidate_id: `GOV${location.county.code}003`,
+            full_name: `Samuel Kiprotich Ruto - ${location.county.name}`,
+            name: 'Samuel Kiprotich',
+            party: 'Reform Alliance',
+            image_url: '/placeholder.svg',
+            position: { id: '2', name: 'Governor', level: 'county' },
+            location_id: location.county.id
           },
 
-          // Women Representative candidates
+          // Women Representative candidates (specific to county)
           {
-            id: '6',
-            candidate_id: 'WR001',
-            full_name: 'Susan Njeri Kimani',
+            id: `wr-${location.county.id}-1`,
+            candidate_id: `WR${location.county.code}001`,
+            full_name: `Susan Njeri Kimani - ${location.county.name}`,
             name: 'Susan Njeri',
             party: 'Women First',
             image_url: '/placeholder.svg',
-            position: { id: '3', name: 'Women Representative', level: 'county' }
+            position: { id: '3', name: 'Women Representative', level: 'county' },
+            location_id: location.county.id
           },
           {
-            id: '7',
-            candidate_id: 'WR002',
-            full_name: 'Faith Wambui Gathua',
+            id: `wr-${location.county.id}-2`,
+            candidate_id: `WR${location.county.code}002`,
+            full_name: `Faith Wambui Gathua - ${location.county.name}`,
             name: 'Faith Wambui',
             party: 'Gender Equality',
             image_url: '/placeholder.svg',
-            position: { id: '3', name: 'Women Representative', level: 'county' }
+            position: { id: '3', name: 'Women Representative', level: 'county' },
+            location_id: location.county.id
+          },
+          {
+            id: `wr-${location.county.id}-3`,
+            candidate_id: `WR${location.county.code}003`,
+            full_name: `Catherine Wairimu Gichuru - ${location.county.name}`,
+            name: 'Catherine Wairimu',
+            party: 'Community Development',
+            image_url: '/placeholder.svg',
+            position: { id: '3', name: 'Women Representative', level: 'county' },
+            location_id: location.county.id
           },
 
-          // MP candidates
+          // MP candidates (specific to subcounty/constituency)
           {
-            id: '8',
-            candidate_id: 'MP001',
-            full_name: 'James Kiprotich Ruto',
+            id: `mp-${location.subcounty.id}-1`,
+            candidate_id: `MP${location.subcounty.id.slice(-3)}001`,
+            full_name: `James Kiprotich Ruto - ${location.subcounty.name}`,
             name: 'James Kiprotich',
             party: 'Reform Alliance',
             image_url: '/placeholder.svg',
-            position: { id: '4', name: 'Member of Parliament', level: 'constituency' }
+            position: { id: '4', name: 'Member of Parliament', level: 'constituency' },
+            location_id: location.subcounty.id
           },
           {
-            id: '9',
-            candidate_id: 'MP002',
-            full_name: 'Robert Macharia Mugo',
+            id: `mp-${location.subcounty.id}-2`,
+            candidate_id: `MP${location.subcounty.id.slice(-3)}002`,
+            full_name: `Robert Macharia Mugo - ${location.subcounty.name}`,
             name: 'Robert Macharia',
             party: 'Grassroots Party',
             image_url: '/placeholder.svg',
-            position: { id: '4', name: 'Member of Parliament', level: 'constituency' }
+            position: { id: '4', name: 'Member of Parliament', level: 'constituency' },
+            location_id: location.subcounty.id
+          },
+          {
+            id: `mp-${location.subcounty.id}-3`,
+            candidate_id: `MP${location.subcounty.id.slice(-3)}003`,
+            full_name: `Alice Nyambura Kihara - ${location.subcounty.name}`,
+            name: 'Alice Nyambura',
+            party: 'Progressive Movement',
+            image_url: '/placeholder.svg',
+            position: { id: '4', name: 'Member of Parliament', level: 'constituency' },
+            location_id: location.subcounty.id
           },
 
-          // MCA candidates
+          // MCA candidates (specific to ward)
           {
-            id: '10',
-            candidate_id: 'MCA001',
-            full_name: 'Francis Mutua Kioko',
+            id: `mca-${location.ward.id}-1`,
+            candidate_id: `MCA${location.ward.id.slice(-3)}001`,
+            full_name: `Francis Mutua Kioko - ${location.ward.name} Ward`,
             name: 'Francis Mutua',
             party: 'Local Development',
             image_url: '/placeholder.svg',
-            position: { id: '5', name: 'Member of County Assembly', level: 'ward' }
+            position: { id: '5', name: 'Member of County Assembly', level: 'ward' },
+            location_id: location.ward.id
           },
           {
-            id: '11',
-            candidate_id: 'MCA002',
-            full_name: 'Catherine Wairimu Gichuru',
+            id: `mca-${location.ward.id}-2`,
+            candidate_id: `MCA${location.ward.id.slice(-3)}002`,
+            full_name: `Catherine Wairimu Gichuru - ${location.ward.name} Ward`,
             name: 'Catherine Wairimu',
             party: 'Community First',
             image_url: '/placeholder.svg',
-            position: { id: '5', name: 'Member of County Assembly', level: 'ward' }
+            position: { id: '5', name: 'Member of County Assembly', level: 'ward' },
+            location_id: location.ward.id
+          },
+          {
+            id: `mca-${location.ward.id}-3`,
+            candidate_id: `MCA${location.ward.id.slice(-3)}003`,
+            full_name: `Paul Ochieng Otieno - ${location.ward.name} Ward`,
+            name: 'Paul Ochieng',
+            party: 'Unity Party',
+            image_url: '/placeholder.svg',
+            position: { id: '5', name: 'Member of County Assembly', level: 'ward' },
+            location_id: location.ward.id
           }
         ];
 
-        setCandidates(sampleCandidates);
+        setCandidates(locationSpecificCandidates);
       } catch (error: any) {
         console.error('Error loading candidates:', error);
         toast({
@@ -411,6 +461,11 @@ const VoterCandidatesPage = () => {
             <CardTitle className="text-3xl font-bold">Select Your Candidates</CardTitle>
             <CardDescription>
               Choose one candidate for each position. All selections are required.
+              {voterLocation && (
+                <div className="mt-2 text-sm text-blue-600 dark:text-blue-400">
+                  Voting in: {voterLocation.ward.name} Ward, {voterLocation.subcounty.name}, {voterLocation.county.name} County
+                </div>
+              )}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -422,6 +477,11 @@ const VoterCandidatesPage = () => {
                 <CardTitle className="text-xl">{position.name}</CardTitle>
                 <CardDescription>
                   Select one candidate for {position.name}
+                  {position.level !== 'country' && voterLocation && (
+                    <span className="text-sm text-gray-600 dark:text-gray-400 ml-2">
+                      (for your {position.level === 'county' ? 'county' : position.level === 'constituency' ? 'constituency' : 'ward'})
+                    </span>
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent>
