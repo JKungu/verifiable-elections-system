@@ -5,9 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Shield, User } from 'lucide-react';
+import { Shield } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { supabase } from '@/integrations/supabase/client';
 
 const ClerkLoginPage = () => {
   const [formData, setFormData] = useState({
@@ -43,8 +44,55 @@ const ClerkLoginPage = () => {
         return;
       }
 
-      // Store clerk data in localStorage for this demo
+      // Check if clerk exists in the database or create new record
+      const { data: existingClerk, error: fetchError } = await supabase
+        .from('citizens')
+        .select('*')
+        .eq('national_id', formData.idNumber)
+        .eq('user_role', 'election_authority')
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error checking clerk:', fetchError);
+        toast({
+          title: "Database Error",
+          description: "Failed to verify clerk credentials.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // If clerk doesn't exist, create a new record
+      if (!existingClerk) {
+        const { error: insertError } = await supabase
+          .from('citizens')
+          .insert({
+            national_id: formData.idNumber,
+            first_name: formData.name.split(' ')[0],
+            last_name: formData.name.split(' ').slice(1).join(' ') || '',
+            email: `${formData.registrationNumber}@clerk.gov.ke`,
+            phone_number: formData.phoneNumber,
+            date_of_birth: '1990-01-01', // Default date, should be updated
+            user_role: 'election_authority',
+            verification_status: 'verified'
+          });
+
+        if (insertError) {
+          console.error('Error creating clerk record:', insertError);
+          toast({
+            title: "Registration Error",
+            description: "Failed to register clerk. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      // Store clerk data in localStorage for session management
       localStorage.setItem('clerkData', JSON.stringify(formData));
+      
+      // Log the clerk login activity
+      console.log('Clerk logged in:', formData.registrationNumber);
       
       toast({
         title: "Login Successful",
@@ -54,6 +102,7 @@ const ClerkLoginPage = () => {
       // Navigate to clerk dashboard
       navigate('/clerk-dashboard');
     } catch (error) {
+      console.error('Login error:', error);
       toast({
         title: "Login Failed",
         description: "Please check your information and try again.",
@@ -79,7 +128,7 @@ const ClerkLoginPage = () => {
           </div>
           <CardTitle className="text-2xl font-bold">Clerk Login</CardTitle>
           <CardDescription>
-            Enter your credentials to access the clerk portal
+            Enter your credentials to access the clerk portal for data collection from all 47 counties
           </CardDescription>
         </CardHeader>
         <CardContent>

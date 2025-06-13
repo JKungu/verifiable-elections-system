@@ -6,19 +6,33 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, BarChart3, Users, LogOut, Shield } from 'lucide-react';
+import { MapPin, BarChart3, Users, LogOut, Shield, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { kenyaLocations } from '@/data/kenyaLocations';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
-interface VoteCount {
-  [candidateId: string]: number;
+interface ClerkData {
+  registrationNumber: string;
+  name: string;
+  phoneNumber: string;
+  idNumber: string;
 }
 
-interface Candidate {
-  id: string;
-  name: string;
-  idNumber: string;
+interface VoteData {
   position: string;
+  candidate_id: string;
+  candidate_name: string;
   party: string;
+  votes: number;
+  location: string;
 }
 
 const ClerkDashboard = () => {
@@ -27,45 +41,25 @@ const ClerkDashboard = () => {
     constituency: '',
     ward: ''
   });
-  const [voteCounts, setVoteCounts] = useState<VoteCount>({});
-  const [clerkData, setClerkData] = useState<any>(null);
+  const [clerkData, setClerkData] = useState<ClerkData | null>(null);
+  const [voteData, setVoteData] = useState<VoteData[]>([]);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Sample data
-  const counties = ['Nairobi County', 'Mombasa County', 'Kisumu County', 'Nakuru County'];
-  const constituencies = {
-    'Nairobi County': ['Westlands', 'Dagoretti North', 'Langata', 'Kasarani'],
-    'Mombasa County': ['Mvita', 'Changamwe', 'Jomba', 'Kisauni'],
-  };
-  const wards = {
-    'Westlands': ['Kitisuru', 'Parklands/Highridge', 'Karura', 'Kangemi'],
-    'Mvita': ['Mji Wa Kale/Makadara', 'Tudor', 'Tononoka', 'Shimanzi/Ganjoni'],
+  // Get counties from Kenya locations data
+  const counties = Object.keys(kenyaLocations);
+  
+  // Get constituencies for selected county
+  const getConstituencies = (county: string) => {
+    if (!county || !kenyaLocations[county]) return [];
+    return Object.keys(kenyaLocations[county]);
   };
 
-  const candidatesByPosition = {
-    'President': [
-      { id: 'p1', name: 'John Kamau', idNumber: '12345678', position: 'President', party: 'Democratic Alliance' },
-      { id: 'p2', name: 'Mary Wanjiku', idNumber: '87654321', position: 'President', party: 'Unity Party' },
-      { id: 'p3', name: 'David Otieno', idNumber: '11223344', position: 'President', party: 'Progressive Movement' }
-    ],
-    'Governor': [
-      { id: 'g1', name: 'Peter Mwangi', idNumber: '55667788', position: 'Governor', party: 'County First' },
-      { id: 'g2', name: 'Grace Akinyi', idNumber: '99887766', position: 'Governor', party: 'Development Party' }
-    ],
-    'Senator': [
-      { id: 's1', name: 'James Kiprotich', idNumber: '33445566', position: 'Senator', party: 'Reform Alliance' },
-      { id: 's2', name: 'Susan Njeri', idNumber: '77889900', position: 'Senator', party: 'People\'s Choice' }
-    ],
-    'Member of Parliament': [
-      { id: 'm1', name: 'Robert Macharia', idNumber: '44556677', position: 'Member of Parliament', party: 'Grassroots Party' },
-      { id: 'm2', name: 'Lucy Wambui', idNumber: '66778899', position: 'Member of Parliament', party: 'Youth Movement' },
-      { id: 'm3', name: 'Joseph Kiplagat', idNumber: '22334455', position: 'Member of Parliament', party: 'Economic Freedom' }
-    ],
-    'Member of County Assembly': [
-      { id: 'c1', name: 'Francis Mutua', idNumber: '11335577', position: 'Member of County Assembly', party: 'Local Development' },
-      { id: 'c2', name: 'Catherine Wairimu', idNumber: '99113355', position: 'Member of County Assembly', party: 'Community First' }
-    ]
+  // Get wards for selected constituency
+  const getWards = (county: string, constituency: string) => {
+    if (!county || !constituency || !kenyaLocations[county]?.[constituency]) return [];
+    return kenyaLocations[county][constituency];
   };
 
   useEffect(() => {
@@ -76,12 +70,6 @@ const ClerkDashboard = () => {
       return;
     }
     setClerkData(JSON.parse(storedClerkData));
-
-    // Load vote counts
-    const storedVotes = localStorage.getItem('allVotes');
-    if (storedVotes) {
-      setVoteCounts(JSON.parse(storedVotes));
-    }
   }, [navigate]);
 
   const handleLocationChange = (field: string, value: string) => {
@@ -93,6 +81,110 @@ const ClerkDashboard = () => {
     }));
   };
 
+  const loadVoteData = async () => {
+    if (!location.county) return;
+    
+    setLoading(true);
+    try {
+      // Build location filter based on selected location
+      let locationFilter = location.county;
+      if (location.constituency) {
+        locationFilter += `, ${location.constituency}`;
+      }
+      if (location.ward) {
+        locationFilter += `, ${location.ward}`;
+      }
+
+      // Fetch votes from the database
+      const { data: votes, error } = await supabase
+        .from('votes')
+        .select(`
+          position_id,
+          candidate_id,
+          created_at
+        `);
+
+      if (error) {
+        console.error('Error fetching votes:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load vote data",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Process vote data - group by position and candidate
+      const votesByCandidate: { [key: string]: number } = {};
+      votes?.forEach(vote => {
+        const key = `${vote.position_id}-${vote.candidate_id}`;
+        votesByCandidate[key] = (votesByCandidate[key] || 0) + 1;
+      });
+
+      // Create structured vote data with sample candidate information
+      const candidateInfo: { [key: string]: { name: string; party: string } } = {
+        'p1': { name: 'John Kamau', party: 'Democratic Alliance' },
+        'p2': { name: 'Mary Wanjiku', party: 'Unity Party' },
+        'p3': { name: 'David Otieno', party: 'Progressive Movement' },
+        'g1': { name: `Peter Mwangi (${location.county})`, party: 'County First' },
+        'g2': { name: `Grace Akinyi (${location.county})`, party: 'Development Party' },
+        'w1': { name: `Susan Njeri (${location.county})`, party: 'Women First' },
+        'w2': { name: `Margaret Wambui (${location.county})`, party: 'Equality Party' },
+        'm1': { name: `Robert Macharia (${location.constituency || location.county})`, party: 'Grassroots Party' },
+        'm2': { name: `Lucy Wambui (${location.constituency || location.county})`, party: 'Youth Movement' },
+        'c1': { name: `Francis Mutua (${location.ward || location.constituency || location.county})`, party: 'Local Development' },
+        'c2': { name: `Catherine Wairimu (${location.ward || location.constituency || location.county})`, party: 'Community First' }
+      };
+
+      const processedData: VoteData[] = [];
+      
+      // Process each position
+      const positions = [
+        { id: 'President', candidates: ['p1', 'p2', 'p3'] },
+        { id: 'Governor', candidates: ['g1', 'g2'] },
+        { id: 'Women Representative', candidates: ['w1', 'w2'] },
+        { id: 'Member of Parliament', candidates: ['m1', 'm2'] },
+        { id: 'Member of County Assembly', candidates: ['c1', 'c2'] }
+      ];
+
+      positions.forEach(position => {
+        position.candidates.forEach(candidateId => {
+          const key = `${position.id}-${candidateId}`;
+          const votes = votesByCandidate[key] || 0;
+          const candidate = candidateInfo[candidateId];
+          
+          if (candidate) {
+            processedData.push({
+              position: position.id,
+              candidate_id: candidateId,
+              candidate_name: candidate.name,
+              party: candidate.party,
+              votes: votes,
+              location: locationFilter
+            });
+          }
+        });
+      });
+
+      setVoteData(processedData);
+    } catch (error) {
+      console.error('Error loading vote data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load vote data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (location.county) {
+      loadVoteData();
+    }
+  }, [location]);
+
   const handleLogout = () => {
     localStorage.removeItem('clerkData');
     toast({
@@ -102,29 +194,42 @@ const ClerkDashboard = () => {
     navigate('/clerk-login');
   };
 
-  const getVoteCount = (candidateId: string): number => {
-    return voteCounts[candidateId] || 0;
+  const exportData = () => {
+    const csvData = voteData.map(vote => ({
+      Position: vote.position,
+      Candidate: vote.candidate_name,
+      Party: vote.party,
+      Votes: vote.votes,
+      Location: vote.location
+    }));
+
+    const csvString = [
+      Object.keys(csvData[0] || {}).join(','),
+      ...csvData.map(row => Object.values(row).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvString], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vote-data-${location.county}-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
-  const getTotalVotesForPosition = (position: string): number => {
-    const candidates = candidatesByPosition[position as keyof typeof candidatesByPosition];
-    return candidates.reduce((total, candidate) => total + getVoteCount(candidate.id), 0);
+  const getVotesByPosition = (position: string) => {
+    return voteData.filter(vote => vote.position === position);
   };
 
-  const getLeadingCandidate = (position: string): Candidate | null => {
-    const candidates = candidatesByPosition[position as keyof typeof candidatesByPosition];
-    let leadingCandidate = null;
-    let maxVotes = 0;
+  const getTotalVotesForPosition = (position: string) => {
+    return getVotesByPosition(position).reduce((total, vote) => total + vote.votes, 0);
+  };
 
-    candidates.forEach(candidate => {
-      const votes = getVoteCount(candidate.id);
-      if (votes > maxVotes) {
-        maxVotes = votes;
-        leadingCandidate = candidate;
-      }
-    });
-
-    return leadingCandidate;
+  const getLeadingCandidate = (position: string) => {
+    const positionVotes = getVotesByPosition(position);
+    return positionVotes.reduce((leader, current) => 
+      current.votes > (leader?.votes || 0) ? current : leader
+    , null);
   };
 
   if (!clerkData) {
@@ -149,10 +254,18 @@ const ClerkDashboard = () => {
                   </CardDescription>
                 </div>
               </div>
-              <Button onClick={handleLogout} variant="outline">
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
+              <div className="flex space-x-2">
+                {voteData.length > 0 && (
+                  <Button onClick={exportData} variant="outline">
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Data
+                  </Button>
+                )}
+                <Button onClick={handleLogout} variant="outline">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </Button>
+              </div>
             </div>
           </CardHeader>
         </Card>
@@ -168,7 +281,7 @@ const ClerkDashboard = () => {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>County</Label>
+                <Label>County ({counties.length} counties)</Label>
                 <Select value={location.county} onValueChange={(value) => handleLocationChange('county', value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select county" />
@@ -182,7 +295,7 @@ const ClerkDashboard = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Constituency</Label>
+                <Label>Constituency ({getConstituencies(location.county).length} constituencies)</Label>
                 <Select 
                   value={location.constituency} 
                   onValueChange={(value) => handleLocationChange('constituency', value)}
@@ -192,7 +305,7 @@ const ClerkDashboard = () => {
                     <SelectValue placeholder="Select constituency" />
                   </SelectTrigger>
                   <SelectContent>
-                    {location.county && constituencies[location.county as keyof typeof constituencies]?.map((constituency) => (
+                    {getConstituencies(location.county).map((constituency) => (
                       <SelectItem key={constituency} value={constituency}>{constituency}</SelectItem>
                     ))}
                   </SelectContent>
@@ -200,7 +313,7 @@ const ClerkDashboard = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Ward</Label>
+                <Label>Ward ({getWards(location.county, location.constituency).length} wards)</Label>
                 <Select 
                   value={location.ward} 
                   onValueChange={(value) => handleLocationChange('ward', value)}
@@ -210,7 +323,7 @@ const ClerkDashboard = () => {
                     <SelectValue placeholder="Select ward" />
                   </SelectTrigger>
                   <SelectContent>
-                    {location.constituency && wards[location.constituency as keyof typeof wards]?.map((ward) => (
+                    {getWards(location.county, location.constituency).map((ward) => (
                       <SelectItem key={ward} value={ward}>{ward}</SelectItem>
                     ))}
                   </SelectContent>
@@ -221,84 +334,101 @@ const ClerkDashboard = () => {
         </Card>
 
         {/* Vote Results */}
-        {location.ward && (
+        {location.county && (
           <div className="space-y-6">
-            {Object.keys(candidatesByPosition).map((position) => {
-              const candidates = candidatesByPosition[position as keyof typeof candidatesByPosition];
-              const totalVotes = getTotalVotesForPosition(position);
-              const leadingCandidate = getLeadingCandidate(position);
+            {loading ? (
+              <Card>
+                <CardContent className="text-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p>Loading vote data...</p>
+                </CardContent>
+              </Card>
+            ) : (
+              ['President', 'Governor', 'Women Representative', 'Member of Parliament', 'Member of County Assembly'].map((position) => {
+                const positionVotes = getVotesByPosition(position);
+                const totalVotes = getTotalVotesForPosition(position);
+                const leadingCandidate = getLeadingCandidate(position);
 
-              return (
-                <Card key={position}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-xl">{position}</CardTitle>
-                        <CardDescription>
-                          {location.ward}, {location.constituency}, {location.county}
-                        </CardDescription>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center space-x-2">
-                          <Users className="h-4 w-4 text-gray-500" />
-                          <span className="text-sm text-gray-600">Total Votes: {totalVotes}</span>
+                return (
+                  <Card key={position}>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-xl">{position}</CardTitle>
+                          <CardDescription>
+                            {location.ward && `${location.ward}, `}
+                            {location.constituency && `${location.constituency}, `}
+                            {location.county}
+                          </CardDescription>
                         </div>
-                        {leadingCandidate && (
-                          <Badge variant="secondary" className="mt-1">
-                            Leading: {leadingCandidate.name}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {candidates.map((candidate) => {
-                        const votes = getVoteCount(candidate.id);
-                        const percentage = totalVotes > 0 ? (votes / totalVotes * 100).toFixed(1) : '0.0';
-                        const isLeading = leadingCandidate?.id === candidate.id;
-
-                        return (
-                          <div key={candidate.id} className="flex items-center justify-between p-4 border rounded-lg">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-4">
-                                <div>
-                                  <h3 className={`font-semibold ${isLeading ? 'text-green-700' : ''}`}>
-                                    {candidate.name}
-                                    {isLeading && <span className="ml-2 text-green-600">👑</span>}
-                                  </h3>
-                                  <p className="text-sm text-gray-600">ID: {candidate.idNumber}</p>
-                                  <Badge variant="outline" className="mt-1">
-                                    {candidate.party}
-                                  </Badge>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className={`text-2xl font-bold ${isLeading ? 'text-green-600' : 'text-gray-900'}`}>
-                                {votes}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                {percentage}%
-                              </div>
-                            </div>
+                        <div className="text-right">
+                          <div className="flex items-center space-x-2">
+                            <Users className="h-4 w-4 text-gray-500" />
+                            <span className="text-sm text-gray-600">Total Votes: {totalVotes}</span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                          {leadingCandidate && (
+                            <Badge variant="secondary" className="mt-1">
+                              Leading: {leadingCandidate.candidate_name}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {positionVotes.length > 0 ? (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Candidate</TableHead>
+                              <TableHead>Party</TableHead>
+                              <TableHead className="text-right">Votes</TableHead>
+                              <TableHead className="text-right">Percentage</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {positionVotes.map((vote) => {
+                              const percentage = totalVotes > 0 ? (vote.votes / totalVotes * 100).toFixed(1) : '0.0';
+                              const isLeading = leadingCandidate?.candidate_id === vote.candidate_id;
+
+                              return (
+                                <TableRow key={vote.candidate_id}>
+                                  <TableCell className={`font-medium ${isLeading ? 'text-green-700' : ''}`}>
+                                    {vote.candidate_name}
+                                    {isLeading && <span className="ml-2">👑</span>}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline">{vote.party}</Badge>
+                                  </TableCell>
+                                  <TableCell className={`text-right font-bold ${isLeading ? 'text-green-600' : ''}`}>
+                                    {vote.votes}
+                                  </TableCell>
+                                  <TableCell className="text-right text-sm text-gray-500">
+                                    {percentage}%
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          No votes recorded for this position in the selected location.
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
           </div>
         )}
 
-        {!location.ward && (
+        {!location.county && (
           <Card>
             <CardContent className="text-center py-12">
               <BarChart3 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-600 mb-2">Select Location to View Results</h3>
-              <p className="text-gray-500">Please select a county, constituency, and ward to view voting results.</p>
+              <p className="text-gray-500">Please select a county to view voting results. All 47 counties available.</p>
             </CardContent>
           </Card>
         )}
