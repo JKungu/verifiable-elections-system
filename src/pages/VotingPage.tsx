@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -134,25 +135,29 @@ const VotingPage = () => {
     }
 
     setIsSubmitting(true);
-    console.log('=== STARTING SIMPLIFIED VOTE SUBMISSION ===');
+    console.log('=== STARTING ATOMIC VOTE SUBMISSION ALGORITHM ===');
     console.log('Voter ID:', voterData.id);
-    console.log('Selections:', selections);
+    console.log('Selections to save:', selections);
 
     try {
-      // Step 1: Verify voter exists and hasn't voted
-      console.log('Step 1: Checking voter status...');
-      const { data: existingVoter, error: voterCheckError } = await supabase
+      // STEP 1: Pre-flight check - Verify voter eligibility
+      console.log('STEP 1: Verifying voter eligibility...');
+      const { data: voterCheck, error: voterError } = await supabase
         .from('voters')
-        .select('id, has_voted')
+        .select('id, has_voted, first_name, last_name')
         .eq('id', voterData.id)
         .single();
 
-      if (voterCheckError) {
-        console.error('Voter check failed:', voterCheckError);
-        throw new Error(`Voter verification failed: ${voterCheckError.message}`);
+      if (voterError) {
+        console.error('Voter verification failed:', voterError);
+        throw new Error(`Voter verification failed: ${voterError.message}`);
       }
 
-      if (existingVoter?.has_voted) {
+      if (!voterCheck) {
+        throw new Error('Voter not found in database');
+      }
+
+      if (voterCheck.has_voted) {
         toast({
           title: "Already Voted",
           description: "You have already cast your vote.",
@@ -161,41 +166,83 @@ const VotingPage = () => {
         return;
       }
 
-      console.log('Voter verified as eligible to vote');
+      console.log('Voter eligibility confirmed:', voterCheck);
 
-      // Step 2: Prepare and insert ALL votes in a single transaction
-      console.log('Step 2: Inserting votes...');
-      const votesToInsert = Object.entries(selections).map(([positionId, candidateId]) => ({
-        voter_id: voterData.id,
-        position_id: positionId,
-        candidate_id: candidateId
-      }));
+      // STEP 2: Prepare vote data with validation
+      console.log('STEP 2: Preparing vote data...');
+      const voteRecords = [];
+      
+      for (const [positionId, candidateId] of Object.entries(selections)) {
+        if (!positionId || !candidateId) {
+          throw new Error(`Invalid selection: position=${positionId}, candidate=${candidateId}`);
+        }
+        
+        voteRecords.push({
+          voter_id: voterData.id,
+          position_id: positionId,
+          candidate_id: candidateId
+        });
+      }
 
-      console.log('Votes to insert:', votesToInsert);
+      console.log('Vote records prepared:', voteRecords);
 
-      const { data: insertedVotes, error: votesError } = await supabase
+      if (voteRecords.length !== positions.length) {
+        throw new Error(`Vote count mismatch: expected ${positions.length}, got ${voteRecords.length}`);
+      }
+
+      // STEP 3: Insert ALL votes atomically
+      console.log('STEP 3: Inserting votes to database...');
+      const { data: insertedVotes, error: insertError } = await supabase
         .from('votes')
-        .insert(votesToInsert)
+        .insert(voteRecords)
         .select('*');
 
-      if (votesError) {
-        console.error('Vote insertion failed:', votesError);
-        throw new Error(`Failed to save votes: ${votesError.message}`);
+      if (insertError) {
+        console.error('Vote insertion failed:', insertError);
+        throw new Error(`Failed to save votes: ${insertError.message}`);
       }
 
-      if (!insertedVotes || insertedVotes.length !== votesToInsert.length) {
-        console.error('Vote count mismatch:', {
-          expected: votesToInsert.length,
-          actual: insertedVotes?.length || 0
+      if (!insertedVotes || insertedVotes.length === 0) {
+        throw new Error('No votes were inserted - database returned empty result');
+      }
+
+      if (insertedVotes.length !== voteRecords.length) {
+        console.error('Insert count mismatch:', {
+          expected: voteRecords.length,
+          actual: insertedVotes.length,
+          inserted: insertedVotes
         });
-        throw new Error('Not all votes were saved successfully');
+        throw new Error(`Only ${insertedVotes.length} of ${voteRecords.length} votes were saved`);
       }
 
-      console.log('All votes inserted successfully:', insertedVotes);
+      console.log('All votes successfully inserted:', insertedVotes);
 
-      // Step 3: Only NOW mark voter as having voted
-      console.log('Step 3: Marking voter as voted...');
-      const { error: voterUpdateError } = await supabase
+      // STEP 4: Verify votes were actually saved
+      console.log('STEP 4: Verifying votes in database...');
+      const { data: savedVotes, error: verifyError } = await supabase
+        .from('votes')
+        .select('*')
+        .eq('voter_id', voterData.id);
+
+      if (verifyError) {
+        console.error('Vote verification failed:', verifyError);
+        throw new Error(`Failed to verify saved votes: ${verifyError.message}`);
+      }
+
+      if (!savedVotes || savedVotes.length !== voteRecords.length) {
+        console.error('Vote verification failed:', {
+          expected: voteRecords.length,
+          found: savedVotes?.length || 0,
+          savedVotes
+        });
+        throw new Error(`Vote verification failed: expected ${voteRecords.length} votes, found ${savedVotes?.length || 0}`);
+      }
+
+      console.log('Vote verification successful:', savedVotes);
+
+      // STEP 5: ONLY NOW mark voter as having voted
+      console.log('STEP 5: Marking voter as voted...');
+      const { error: updateError } = await supabase
         .from('voters')
         .update({ 
           has_voted: true,
@@ -203,14 +250,27 @@ const VotingPage = () => {
         })
         .eq('id', voterData.id);
 
-      if (voterUpdateError) {
-        console.error('Failed to update voter status:', voterUpdateError);
-        // This is critical - if we can't mark them as voted, they could vote again
-        throw new Error(`Failed to record voting status: ${voterUpdateError.message}`);
+      if (updateError) {
+        console.error('Failed to mark voter as voted:', updateError);
+        // This is critical - votes are saved but voter not marked as voted
+        throw new Error(`Critical error: Votes saved but failed to mark as voted: ${updateError.message}`);
       }
 
-      console.log('Voter marked as voted successfully');
-      console.log('=== VOTE SUBMISSION COMPLETED SUCCESSFULLY ===');
+      // STEP 6: Final verification
+      console.log('STEP 6: Final verification...');
+      const { data: finalCheck, error: finalError } = await supabase
+        .from('voters')
+        .select('has_voted, voted_at')
+        .eq('id', voterData.id)
+        .single();
+
+      if (finalError || !finalCheck?.has_voted) {
+        console.error('Final verification failed:', finalError || 'Voter not marked as voted');
+        throw new Error('Final verification failed');
+      }
+
+      console.log('=== VOTE SUBMISSION ALGORITHM COMPLETED SUCCESSFULLY ===');
+      console.log('Final state:', finalCheck);
 
       toast({
         title: "Vote Submitted Successfully",
@@ -225,13 +285,23 @@ const VotingPage = () => {
       });
 
     } catch (error: any) {
-      console.error('=== VOTE SUBMISSION FAILED ===');
-      console.error('Error:', error);
+      console.error('=== VOTE SUBMISSION ALGORITHM FAILED ===');
+      console.error('Error details:', error);
+      
+      // Enhanced error reporting
+      const errorMessage = error.message || "An unexpected error occurred";
+      
       toast({
         title: "Vote Submission Failed",
-        description: error.message || "An error occurred while submitting your vote.",
+        description: errorMessage,
         variant: "destructive",
       });
+
+      // Log additional context for debugging
+      console.error('Voter ID:', voterData.id);
+      console.error('Selections:', selections);
+      console.error('Error stack:', error.stack);
+      
     } finally {
       setIsSubmitting(false);
     }
