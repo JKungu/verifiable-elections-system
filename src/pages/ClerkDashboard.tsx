@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { MapPin, BarChart3, Users, LogOut, Shield, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { kenyaLocations } from '@/data/kenyaLocations';
+import kenyaLocations from '@/data/kenyaLocations';
 import {
   Table,
   TableBody,
