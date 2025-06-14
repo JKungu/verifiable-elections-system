@@ -107,9 +107,10 @@ const ClerkDashboard = () => {
         },
         (payload) => {
           console.log('Real-time vote update received:', payload);
+          const newData = payload.new as any;
           toast({
             title: "New Vote Cast",
-            description: `Vote recorded for ${payload.new?.position_id || 'position'}`,
+            description: `Vote recorded for ${newData?.position_id || 'position'}`,
           });
           loadVoteData();
         }
@@ -130,10 +131,11 @@ const ClerkDashboard = () => {
         },
         (payload) => {
           console.log('Real-time voter update received:', payload);
-          if (payload.eventType === 'UPDATE' && payload.new?.has_voted) {
+          const newData = payload.new as any;
+          if (payload.eventType === 'UPDATE' && newData?.has_voted) {
             toast({
               title: "Voter Registered",
-              description: `${payload.new.first_name} ${payload.new.last_name} has voted`,
+              description: `${newData.first_name} ${newData.last_name} has voted`,
             });
           }
           loadVoterData();
