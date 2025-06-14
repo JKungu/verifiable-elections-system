@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,12 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, LogOut, Shield, Download, Radio } from 'lucide-react';
+import { MapPin, LogOut, Shield, Download, Radio, Users, Vote, BarChart3, TrendingUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { COUNTIES } from '@/data/kenyaLocations';
-import VoteDistributionChart from '@/components/VoteDistributionChart';
-import VoteStatsOverview from '@/components/VoteStatsOverview';
 
 interface ClerkData {
   registrationNumber: string;
@@ -435,7 +434,7 @@ const ClerkDashboard = () => {
                 </div>
                 <div>
                   <CardTitle className="text-2xl flex items-center gap-2">
-                    Election Vote Distribution Dashboard
+                    Election Clerk Dashboard
                     <div className="flex items-center gap-1">
                       <Radio className={`h-4 w-4 ${isRealTimeConnected ? 'text-green-500' : 'text-red-500'}`} />
                       <span className={`text-sm font-medium ${isRealTimeConnected ? 'text-green-600' : 'text-red-600'}`}>
@@ -444,7 +443,7 @@ const ClerkDashboard = () => {
                     </div>
                   </CardTitle>
                   <CardDescription>
-                    Welcome, {clerkData.name} (Reg: {clerkData.registrationNumber}) - Real-time vote monitoring and distribution
+                    Welcome, {clerkData.name} (Reg: {clerkData.registrationNumber}) - Real-time vote monitoring
                   </CardDescription>
                 </div>
               </div>
@@ -469,10 +468,10 @@ const ClerkDashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center">
               <MapPin className="h-5 w-5 mr-2" />
-              Select Location to Monitor Vote Distribution
+              Select Location to Monitor
             </CardTitle>
             <CardDescription>
-              Choose a specific location to view detailed vote distribution and candidate performance
+              Choose a specific location to view detailed voting statistics
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -533,26 +532,80 @@ const ClerkDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Vote Statistics Overview */}
+        {/* Overview Statistics */}
         {voterStats && (
-          <VoteStatsOverview
-            totalRegistered={voterStats.totalRegistered}
-            totalVoted={voterStats.totalVoted}
-            totalVotes={getTotalVotesAcrossAllPositions()}
-            turnoutPercentage={voterStats.turnoutPercentage}
-            locationName={getLocationDisplayName()}
-            isRealTimeConnected={isRealTimeConnected}
-          />
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Overview Statistics - {getLocationDisplayName()}
+                <Badge variant={isRealTimeConnected ? "default" : "destructive"}>
+                  {isRealTimeConnected ? "LIVE" : "OFFLINE"}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-2xl font-bold text-blue-600">
+                        {voterStats.totalRegistered.toLocaleString()}
+                      </div>
+                      <div className="text-sm text-blue-500">Registered Voters</div>
+                    </div>
+                    <Users className="h-8 w-8 text-blue-400" />
+                  </div>
+                </div>
+                
+                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-2xl font-bold text-green-600">
+                        {voterStats.totalVoted.toLocaleString()}
+                      </div>
+                      <div className="text-sm text-green-500">Voters Participated</div>
+                    </div>
+                    <Vote className="h-8 w-8 text-green-400" />
+                  </div>
+                </div>
+                
+                <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-2xl font-bold text-purple-600">
+                        {voterStats.turnoutPercentage.toFixed(1)}%
+                      </div>
+                      <div className="text-sm text-purple-500">Voter Turnout</div>
+                    </div>
+                    <TrendingUp className="h-8 w-8 text-purple-400" />
+                  </div>
+                </div>
+                
+                <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-2xl font-bold text-orange-600">
+                        {getTotalVotesAcrossAllPositions().toLocaleString()}
+                      </div>
+                      <div className="text-sm text-orange-500">Total Votes Cast</div>
+                    </div>
+                    <Vote className="h-8 w-8 text-orange-400" />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
-        {/* Vote Distribution Charts */}
+        {/* Vote Results by Position */}
         <div className="space-y-6">
           <div className="text-center mb-6">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Live Vote Distribution by Position - {getLocationDisplayName()}
+              Vote Results by Position - {getLocationDisplayName()}
             </h2>
             <p className="text-gray-600 dark:text-gray-300 mt-2">
-              Real-time vote counts and distribution percentages for all electoral positions
+              Real-time vote counts and candidate performance
             </p>
           </div>
 
@@ -560,18 +613,68 @@ const ClerkDashboard = () => {
             <Card>
               <CardContent className="text-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p>Loading live vote distribution data...</p>
+                <p>Loading vote data...</p>
               </CardContent>
             </Card>
           ) : (
-            electionPositions.map((position) => (
-              <VoteDistributionChart
-                key={position.id}
-                voteData={voteData}
-                position={position.id}
-                positionIcon={position.icon}
-              />
-            ))
+            electionPositions.map((position) => {
+              const positionVotes = voteData.filter(vote => vote.position === position.id);
+              const totalVotes = positionVotes.reduce((total, vote) => total + vote.votes, 0);
+              const sortedVotes = positionVotes.sort((a, b) => b.votes - a.votes);
+
+              return (
+                <Card key={position.id} className="mb-4">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <span className="text-xl">{position.icon}</span>
+                      {position.id}
+                      <Badge variant="outline">{totalVotes} total votes</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {sortedVotes.length > 0 ? (
+                      <div className="space-y-3">
+                        {sortedVotes.map((vote, index) => {
+                          const percentage = totalVotes > 0 ? (vote.votes / totalVotes * 100) : 0;
+                          const isLeading = index === 0 && totalVotes > 0;
+                          
+                          return (
+                            <div key={vote.candidate_id} className={`p-3 rounded-lg border ${isLeading ? 'bg-green-50 border-green-200' : 'bg-gray-50'}`}>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  {isLeading && <span className="text-lg">🏆</span>}
+                                  <div>
+                                    <h4 className={`font-semibold ${isLeading ? 'text-green-700' : ''}`}>
+                                      {vote.candidate_name}
+                                    </h4>
+                                    <Badge variant="outline" className="text-xs">
+                                      {vote.party}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className={`text-xl font-bold ${isLeading ? 'text-green-600' : ''}`}>
+                                    {vote.votes}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {percentage.toFixed(1)}%
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <div className="text-4xl mb-2">📊</div>
+                        <p>No votes recorded yet for this position</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </div>
       </div>
