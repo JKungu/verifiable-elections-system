@@ -140,7 +140,7 @@ const VotingPage = () => {
       console.log('Voter data:', voterData);
       console.log('Vote selections:', selections);
 
-      // First, let's check if the voter has already voted
+      // First, check if the voter has already voted
       const { data: existingVoter, error: voterCheckError } = await supabase
         .from('voters')
         .select('has_voted, id')
@@ -154,7 +154,7 @@ const VotingPage = () => {
 
       console.log('Voter check result:', existingVoter);
 
-      if (existingVoter.has_voted) {
+      if (existingVoter?.has_voted) {
         toast({
           title: "Already Voted",
           description: "You have already cast your vote.",
@@ -164,8 +164,10 @@ const VotingPage = () => {
         return;
       }
 
-      // Insert each vote individually with proper error handling
-      const voteInsertPromises = Object.entries(selections).map(async ([positionId, candidateId]) => {
+      // Insert each vote with a transaction-like approach
+      console.log('Starting vote insertion process...');
+      
+      for (const [positionId, candidateId] of Object.entries(selections)) {
         console.log(`Inserting vote for position: ${positionId}, candidate: ${candidateId}, voter: ${voterData.id}`);
         
         const voteData = {
@@ -190,16 +192,13 @@ const VotingPage = () => {
             hint: voteError.hint,
             code: voteError.code
           });
-          throw voteError;
+          throw new Error(`Failed to save vote for ${positionId}: ${voteError.message}`);
         }
 
         console.log(`Successfully inserted vote for ${positionId}:`, insertedVote);
-        return insertedVote;
-      });
+      }
 
-      console.log('Waiting for all vote insertions to complete...');
-      const insertedVotes = await Promise.all(voteInsertPromises);
-      console.log('All votes inserted successfully:', insertedVotes);
+      console.log('All votes inserted successfully');
 
       // Update voter status to has_voted = true
       console.log('Updating voter status...');
@@ -215,7 +214,7 @@ const VotingPage = () => {
 
       if (voterUpdateError) {
         console.error('Error updating voter status:', voterUpdateError);
-        throw voterUpdateError;
+        throw new Error(`Failed to update voter status: ${voterUpdateError.message}`);
       }
 
       console.log('Voter status updated successfully:', updatedVoter);
@@ -234,15 +233,13 @@ const VotingPage = () => {
         }
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('=== ERROR DURING VOTE SUBMISSION ===');
       console.error('Full error object:', error);
-      console.error('Error message:', error.message);
-      console.error('Error details:', error.details);
       
       toast({
         title: "Submission Failed",
-        description: `There was an error submitting your vote: ${error.message}. Please try again.`,
+        description: `There was an error submitting your vote: ${error.message || 'Unknown error'}. Please try again.`,
         variant: "destructive",
       });
     } finally {
@@ -260,7 +257,7 @@ const VotingPage = () => {
   const allPositionsSelected = positions.every(pos => selections[pos.id]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <Card className="mb-6">
@@ -293,7 +290,7 @@ const VotingPage = () => {
                 {Object.keys(selections).length} of {positions.length} completed
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div 
                 className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${(Object.keys(selections).length / positions.length) * 100}%` }}
@@ -315,19 +312,19 @@ const VotingPage = () => {
                   key={candidate.id}
                   className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
                     selectedCandidate === candidate.id
-                      ? 'border-blue-500 bg-blue-50 shadow-md'
-                      : 'border-gray-200 hover:border-blue-300 hover:bg-blue-25'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 hover:bg-blue-25 dark:hover:bg-blue-900/10'
                   }`}
                   onClick={() => handleCandidateSelect(currentPosition.id, candidate.id)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
-                      <div className="bg-gray-200 p-3 rounded-full">
-                        <User className="h-6 w-6 text-gray-600" />
+                      <div className="bg-gray-200 dark:bg-gray-700 p-3 rounded-full">
+                        <User className="h-6 w-6 text-gray-600 dark:text-gray-300" />
                       </div>
                       <div>
                         <h3 className="font-semibold text-lg">{candidate.name}</h3>
-                        <p className="text-gray-600">{candidate.party}</p>
+                        <p className="text-gray-600 dark:text-gray-400">{candidate.party}</p>
                       </div>
                     </div>
                     {selectedCandidate === candidate.id && (

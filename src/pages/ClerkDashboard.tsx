@@ -435,7 +435,7 @@ const ClerkDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <Card className="mb-6">
@@ -556,17 +556,17 @@ const ClerkDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">{locationStats.totalVotes}</div>
-                  <div className="text-sm text-blue-500">Total Votes Cast</div>
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{locationStats.totalVotes}</div>
+                  <div className="text-sm text-blue-500 dark:text-blue-300">Total Votes Cast</div>
                 </div>
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">{locationStats.voterTurnout}</div>
-                  <div className="text-sm text-green-500">Voter Participation</div>
+                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">{locationStats.voterTurnout}</div>
+                  <div className="text-sm text-green-500 dark:text-green-300">Voter Participation</div>
                 </div>
-                <div className="bg-purple-50 p-4 rounded-lg">
-                  <div className="text-sm font-medium text-purple-600">{locationStats.lastUpdated}</div>
-                  <div className="text-sm text-purple-500">Last Updated</div>
+                <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
+                  <div className="text-sm font-medium text-purple-600 dark:text-purple-400">{locationStats.lastUpdated}</div>
+                  <div className="text-sm text-purple-500 dark:text-purple-300">Last Updated</div>
                 </div>
               </div>
             </CardContent>
