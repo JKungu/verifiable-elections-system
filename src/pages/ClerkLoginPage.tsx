@@ -44,7 +44,7 @@ const ClerkLoginPage = () => {
         return;
       }
 
-      // Check if clerk exists in the database or create new record
+      // Check if clerk exists in the database
       const { data: existingClerk, error: fetchError } = await supabase
         .from('citizens')
         .select('*')
@@ -55,37 +55,29 @@ const ClerkLoginPage = () => {
       if (fetchError && fetchError.code !== 'PGRST116') {
         console.error('Error checking clerk:', fetchError);
         toast({
-          title: "Database Error",
+          title: "Database Error", 
           description: "Failed to verify clerk credentials.",
           variant: "destructive",
         });
         return;
       }
 
-      // If clerk doesn't exist, create a new record
+      // If clerk doesn't exist, we'll create a simple session without database insertion
+      // In a real system, clerk records would be pre-registered by system administrators
       if (!existingClerk) {
-        const { error: insertError } = await supabase
-          .from('citizens')
-          .insert({
-            national_id: formData.idNumber,
-            first_name: formData.name.split(' ')[0],
-            last_name: formData.name.split(' ').slice(1).join(' ') || '',
-            email: `${formData.registrationNumber}@clerk.gov.ke`,
-            phone_number: formData.phoneNumber,
-            date_of_birth: '1990-01-01', // Default date, should be updated
-            user_role: 'election_authority',
-            verification_status: 'verified'
-          });
-
-        if (insertError) {
-          console.error('Error creating clerk record:', insertError);
-          toast({
-            title: "Registration Error",
-            description: "Failed to register clerk. Please try again.",
-            variant: "destructive",
-          });
-          return;
-        }
+        console.log('Clerk not found in database, creating temporary session');
+        
+        // For this demo, we'll allow the clerk to login without database verification
+        // In production, all clerks should be pre-registered in the system
+        toast({
+          title: "Login Successful",
+          description: "Welcome to the clerk portal! (Demo mode)",
+        });
+      } else {
+        toast({
+          title: "Login Successful",
+          description: "Welcome back to the clerk portal!",
+        });
       }
 
       // Store clerk data in localStorage for session management
@@ -93,11 +85,6 @@ const ClerkLoginPage = () => {
       
       // Log the clerk login activity
       console.log('Clerk logged in:', formData.registrationNumber);
-      
-      toast({
-        title: "Login Successful",
-        description: "Welcome to the clerk portal!",
-      });
 
       // Navigate to clerk dashboard
       navigate('/clerk-dashboard');
