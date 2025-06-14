@@ -154,8 +154,41 @@ const ClerkDashboard = () => {
   };
 
   const getCandidateDisplayName = (candidateId: string, positionId: string) => {
-    // Base candidate information
+    // Map position names to readable format
+    const positionMap: { [key: string]: string } = {
+      '1': 'President',
+      '2': 'Governor', 
+      '3': 'Women Representative',
+      '4': 'Member of Parliament',
+      '5': 'Member of County Assembly'
+    };
+
+    const readablePosition = positionMap[positionId] || positionId;
+
+    // Base candidate information with more candidates
     const candidateInfo: { [key: string]: { name: string; party: string } } = {
+      // Presidential candidates
+      '1': { name: 'John Kamau', party: 'Democratic Alliance' },
+      '2': { name: 'Mary Wanjiku', party: 'Unity Party' },
+      '3': { name: 'David Otieno', party: 'Progressive Movement' },
+      
+      // Governor candidates (county specific)
+      'gov-county-022-1': { name: 'Peter Mwangi', party: 'County First' },
+      'gov-county-022-2': { name: 'Grace Akinyi', party: 'Development Party' },
+      
+      // Women Representative candidates (county specific)
+      'wr-county-022-1': { name: 'Susan Njeri', party: 'Women First' },
+      'wr-county-022-2': { name: 'Margaret Wambui', party: 'Equality Party' },
+      
+      // MP candidates (constituency specific)
+      'mp-subcounty-111-1': { name: 'Robert Macharia', party: 'Grassroots Party' },
+      'mp-subcounty-111-2': { name: 'Lucy Wambui', party: 'Youth Movement' },
+      
+      // MCA candidates (ward specific)
+      'mca-ward-0547-1': { name: 'Francis Mutua', party: 'Local Development' },
+      'mca-ward-0547-2': { name: 'Catherine Wairimu', party: 'Community First' },
+      
+      // Additional fallback candidates for different IDs
       'p1': { name: 'John Kamau', party: 'Democratic Alliance' },
       'p2': { name: 'Mary Wanjiku', party: 'Unity Party' },
       'p3': { name: 'David Otieno', party: 'Progressive Movement' },
@@ -170,21 +203,9 @@ const ClerkDashboard = () => {
     };
 
     const candidate = candidateInfo[candidateId];
-    if (!candidate) return { name: `Unknown Candidate (${candidateId})`, party: 'Independent' };
+    if (!candidate) return { name: `Candidate ${candidateId}`, party: 'Independent' };
 
-    // Add location context for local positions
-    let name = candidate.name;
-    if (positionId === 'Governor' && location.county !== 'all') {
-      name += ` (${location.county})`;
-    } else if (positionId === 'Women Representative' && location.county !== 'all') {
-      name += ` (${location.county})`;
-    } else if (positionId === 'Member of Parliament' && location.constituency !== 'all') {
-      name += ` (${location.constituency})`;
-    } else if (positionId === 'Member of County Assembly' && location.ward !== 'all') {
-      name += ` (${location.ward})`;
-    }
-
-    return { name, party: candidate.party };
+    return { name: candidate.name, party: candidate.party };
   };
 
   const loadVoteData = async () => {
@@ -223,6 +244,7 @@ const ClerkDashboard = () => {
 
       // Process vote data - group by position and candidate
       const votesByCandidate: { [key: string]: number } = {};
+      
       votes.forEach(vote => {
         const key = `${vote.position_id}-${vote.candidate_id}`;
         votesByCandidate[key] = (votesByCandidate[key] || 0) + 1;
@@ -232,21 +254,47 @@ const ClerkDashboard = () => {
 
       const processedData: VoteData[] = [];
       
-      // Process each position
+      // Define all possible positions and their candidates
       const positions = [
-        { id: 'President', candidates: ['p1', 'p2', 'p3'] },
-        { id: 'Governor', candidates: ['g1', 'g2'] },
-        { id: 'Women Representative', candidates: ['w1', 'w2'] },
-        { id: 'Member of Parliament', candidates: ['m1', 'm2'] },
-        { id: 'Member of County Assembly', candidates: ['c1', 'c2'] }
+        { 
+          id: 'President', 
+          position_ids: ['1'], 
+          candidates: ['1', '2', '3', 'p1', 'p2', 'p3'] 
+        },
+        { 
+          id: 'Governor', 
+          position_ids: ['2'], 
+          candidates: ['gov-county-022-1', 'gov-county-022-2', 'g1', 'g2'] 
+        },
+        { 
+          id: 'Women Representative', 
+          position_ids: ['3'], 
+          candidates: ['wr-county-022-1', 'wr-county-022-2', 'w1', 'w2'] 
+        },
+        { 
+          id: 'Member of Parliament', 
+          position_ids: ['4'], 
+          candidates: ['mp-subcounty-111-1', 'mp-subcounty-111-2', 'm1', 'm2'] 
+        },
+        { 
+          id: 'Member of County Assembly', 
+          position_ids: ['5'], 
+          candidates: ['mca-ward-0547-1', 'mca-ward-0547-2', 'c1', 'c2'] 
+        }
       ];
 
       let totalVotesCount = 0;
       
       positions.forEach(position => {
         position.candidates.forEach(candidateId => {
-          const key = `${position.id}-${candidateId}`;
-          const votes = votesByCandidate[key] || 0;
+          let votes = 0;
+          
+          // Check all possible position IDs for this candidate
+          position.position_ids.forEach(positionId => {
+            const key = `${positionId}-${candidateId}`;
+            votes += votesByCandidate[key] || 0;
+          });
+          
           totalVotesCount += votes;
           
           const candidateInfo = getCandidateDisplayName(candidateId, position.id);
