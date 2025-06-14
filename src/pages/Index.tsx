@@ -11,21 +11,21 @@ const Index = () => {
         {/* Hero Section */}
         <div className="text-center mb-16">
           <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            Secure Digital Voting Platform
+            Secure Digital Voting for Kenya
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            Experience democracy in the digital age with Estonia-inspired i-Voting technology. 
-            Secure, anonymous, and verifiable elections at your fingertips.
+            Experience transparent, secure, and accessible elections with our advanced 
+            digital voting platform. Every vote counts, every voice matters.
           </p>
           <div className="space-x-4">
             <Link to="/voter-login">
-              <Button size="lg" className="px-8 py-3">
+              <Button size="lg" className="px-8 py-3 bg-gray-800 hover:bg-gray-900">
                 Vote Now
               </Button>
             </Link>
             <Link to="/clerk-login">
               <Button variant="outline" size="lg" className="px-8 py-3">
-                Clerk Login
+                Clerk Portal
               </Button>
             </Link>
           </div>
@@ -33,87 +33,66 @@ const Index = () => {
 
         {/* Features Section */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-          <Card>
+          <Card className="text-center">
             <CardHeader>
-              <Shield className="h-12 w-12 text-blue-600 mb-4" />
-              <CardTitle>Secure Authentication</CardTitle>
+              <Shield className="h-12 w-12 text-green-600 mb-4 mx-auto" />
+              <CardTitle className="text-lg">Secure & Encrypted</CardTitle>
             </CardHeader>
             <CardContent>
               <CardDescription>
-                ID-based verification system for secure voter authentication
+                Federal-grade encryption technology and multi-layered security for a safe voting experience.
               </CardDescription>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="text-center">
             <CardHeader>
-              <Lock className="h-12 w-12 text-green-600 mb-4" />
-              <CardTitle>Anonymous Voting</CardTitle>
+              <Lock className="h-12 w-12 text-blue-600 mb-4 mx-auto" />
+              <CardTitle className="text-lg">Transparent Process</CardTitle>
             </CardHeader>
             <CardContent>
               <CardDescription>
-                Your vote is encrypted and anonymized to protect your privacy
+                Real-time verification and audit trail to ensure complete transparency.
               </CardDescription>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="text-center">
             <CardHeader>
-              <Eye className="h-12 w-12 text-purple-600 mb-4" />
-              <CardTitle>Transparent & Verifiable</CardTitle>
+              <Eye className="h-12 w-12 text-purple-600 mb-4 mx-auto" />
+              <CardTitle className="text-lg">Easy Access</CardTitle>
             </CardHeader>
             <CardContent>
               <CardDescription>
-                Verify your vote was counted without revealing your identity
+                Simple, intuitive interface accessible from any device, anywhere.
               </CardDescription>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="text-center">
             <CardHeader>
-              <FileText className="h-12 w-12 text-orange-600 mb-4" />
-              <CardTitle>Comprehensive Audit</CardTitle>
+              <FileText className="h-12 w-12 text-orange-600 mb-4 mx-auto" />
+              <CardTitle className="text-lg">Verified Results</CardTitle>
             </CardHeader>
             <CardContent>
               <CardDescription>
-                Complete election integrity with detailed audit trails
+                Guaranteed vote verification and instant result reporting.
               </CardDescription>
             </CardContent>
           </Card>
         </div>
 
-        {/* How It Works Section */}
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <h2 className="text-3xl font-bold text-center mb-8">How It Works</h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-blue-600">1</span>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Enter ID Details</h3>
-              <p className="text-gray-600">
-                Use your national ID number and personal details to access the voting system
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-green-600">2</span>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Cast Your Vote</h3>
-              <p className="text-gray-600">
-                Select your location and securely vote for your preferred candidates
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="bg-purple-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-purple-600">3</span>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Verify & Track</h3>
-              <p className="text-gray-600">
-                Confirm your vote was counted and view election results
-              </p>
-            </div>
-          </div>
+        {/* Call to Action Section */}
+        <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+          <h2 className="text-3xl font-bold mb-4">Ready to Make Your Voice Heard?</h2>
+          <p className="text-lg text-gray-600 mb-6">
+            Join millions of Kenyans in shaping the future of our nation through secure digital voting.
+          </p>
+          <Link to="/voter-login">
+            <Button size="lg" className="px-8 py-3 bg-gray-800 hover:bg-gray-900">
+              Start Voting Process
+            </Button>
+          </Link>
         </div>
       </div>
     </div>
