@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, BarChart3, Users, LogOut, Shield, Download } from 'lucide-react';
+import { MapPin, BarChart3, Users, LogOut, Shield, Download, Radio } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { COUNTIES } from '@/data/kenyaLocations';
@@ -50,6 +51,7 @@ const ClerkDashboard = () => {
   const [voteData, setVoteData] = useState<VoteData[]>([]);
   const [locationStats, setLocationStats] = useState<LocationVoteStats | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isRealTimeConnected, setIsRealTimeConnected] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -80,6 +82,56 @@ const ClerkDashboard = () => {
     setClerkData(JSON.parse(storedClerkData));
   }, [navigate]);
 
+  // Set up real-time subscription for votes
+  useEffect(() => {
+    console.log('Setting up real-time subscription for votes...');
+    
+    const channel = supabase
+      .channel('votes-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'votes'
+        },
+        (payload) => {
+          console.log('Real-time vote update received:', payload);
+          
+          // Show toast notification for new votes
+          if (payload.eventType === 'INSERT') {
+            toast({
+              title: "New Vote Cast",
+              description: `Vote received for ${payload.new.position_id}`,
+            });
+          }
+          
+          // Refresh vote data when changes occur
+          if (location.county) {
+            loadVoteData();
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Real-time subscription status:', status);
+        setIsRealTimeConnected(status === 'SUBSCRIBED');
+        
+        if (status === 'SUBSCRIBED') {
+          toast({
+            title: "Real-time Connected",
+            description: "Live vote updates are now active",
+          });
+        }
+      });
+
+    // Cleanup subscription on unmount
+    return () => {
+      console.log('Cleaning up real-time subscription');
+      supabase.removeChannel(channel);
+      setIsRealTimeConnected(false);
+    };
+  }, [location.county, toast]);
+
   const handleLocationChange = (field: string, value: string) => {
     setLocation(prev => ({
       ...prev,
@@ -94,9 +146,9 @@ const ClerkDashboard = () => {
     
     setLoading(true);
     try {
-      console.log('Loading vote data for location:', location);
+      console.log('Loading real-time vote data for location:', location);
 
-      // Fetch all votes from the database
+      // Fetch all votes from the database in real-time
       const { data: votes, error: votesError } = await supabase
         .from('votes')
         .select(`
@@ -104,7 +156,8 @@ const ClerkDashboard = () => {
           candidate_id,
           created_at,
           voter_id
-        `);
+        `)
+        .order('created_at', { ascending: false }); // Get most recent votes first
 
       if (votesError) {
         console.error('Error fetching votes:', votesError);
@@ -116,7 +169,7 @@ const ClerkDashboard = () => {
         return;
       }
 
-      console.log('Fetched votes from database:', votes);
+      console.log('Fetched real-time votes from database:', votes?.length || 0, 'votes');
 
       // Fetch voter data to get location information
       const { data: voters, error: votersError } = await supabase
@@ -127,7 +180,7 @@ const ClerkDashboard = () => {
         console.error('Error fetching voters:', votersError);
       }
 
-      console.log('Fetched voters:', voters);
+      console.log('Fetched voters:', voters?.length || 0, 'voters');
 
       // Create a map of voter_id to location
       const voterLocationMap = new Map();
@@ -137,22 +190,10 @@ const ClerkDashboard = () => {
         }
       });
 
-      // Filter votes by location - simplified logic
+      // For demo purposes, show all votes for any selected county
       let filteredVotes = votes || [];
-      if (voterLocationMap.size > 0 && location.county) {
-        filteredVotes = votes?.filter(vote => {
-          if (!vote.voter_id) return false;
-          const voterLocation = voterLocationMap.get(vote.voter_id);
-          if (!voterLocation) return false;
-          
-          // For now, show all votes for the selected county
-          // In a real system, you would have proper location matching
-          // Since we're in demo mode, let's show all available votes
-          return true;
-        }) || [];
-      }
-
-      console.log('Filtered votes for location:', filteredVotes);
+      
+      console.log('Processing votes for display:', filteredVotes.length);
 
       // Process vote data - group by position and candidate
       const votesByCandidate: { [key: string]: number } = {};
@@ -161,7 +202,7 @@ const ClerkDashboard = () => {
         votesByCandidate[key] = (votesByCandidate[key] || 0) + 1;
       });
 
-      console.log('Votes by candidate:', votesByCandidate);
+      console.log('Real-time votes by candidate:', votesByCandidate);
 
       // Create candidate information based on the database structure
       const candidateInfo: { [key: string]: { name: string; party: string } } = {
@@ -213,21 +254,21 @@ const ClerkDashboard = () => {
 
       setVoteData(processedData);
 
-      // Set location statistics
+      // Set location statistics with real-time data
       setLocationStats({
         totalVotes: totalVotesCount,
         voterTurnout: totalVotesCount,
         lastUpdated: new Date().toLocaleString()
       });
 
-      console.log('Processed vote data:', processedData);
-      console.log('Location stats:', { totalVotes: totalVotesCount });
+      console.log('Real-time processed vote data:', processedData.length, 'entries');
+      console.log('Real-time location stats:', { totalVotes: totalVotesCount });
 
     } catch (error) {
-      console.error('Error loading vote data:', error);
+      console.error('Error loading real-time vote data:', error);
       toast({
         title: "Error",
-        description: "Failed to load vote data",
+        description: "Failed to load real-time vote data",
         variant: "destructive",
       });
     } finally {
@@ -256,7 +297,8 @@ const ClerkDashboard = () => {
       Candidate: vote.candidate_name,
       Party: vote.party,
       Votes: vote.votes,
-      Location: vote.location
+      Location: vote.location,
+      LastUpdated: locationStats?.lastUpdated || new Date().toLocaleString()
     }));
 
     const csvString = [
@@ -268,13 +310,13 @@ const ClerkDashboard = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `vote-data-${location.county}-${Date.now()}.csv`;
+    a.download = `real-time-vote-data-${location.county}-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
 
     toast({
       title: "Export Complete",
-      description: "Vote data has been exported successfully.",
+      description: "Real-time vote data has been exported successfully.",
     });
   };
 
@@ -309,9 +351,17 @@ const ClerkDashboard = () => {
                   <Shield className="h-8 w-8 text-white" />
                 </div>
                 <div>
-                  <CardTitle className="text-2xl">Clerk Dashboard</CardTitle>
+                  <CardTitle className="text-2xl flex items-center gap-2">
+                    Real-time Clerk Dashboard
+                    <div className="flex items-center gap-1">
+                      <Radio className={`h-4 w-4 ${isRealTimeConnected ? 'text-green-500' : 'text-red-500'}`} />
+                      <span className={`text-sm ${isRealTimeConnected ? 'text-green-600' : 'text-red-600'}`}>
+                        {isRealTimeConnected ? 'LIVE' : 'OFFLINE'}
+                      </span>
+                    </div>
+                  </CardTitle>
                   <CardDescription>
-                    Welcome, {clerkData.name} (Reg: {clerkData.registrationNumber})
+                    Welcome, {clerkData.name} (Reg: {clerkData.registrationNumber}) - Monitoring live vote updates
                   </CardDescription>
                 </div>
               </div>
@@ -319,7 +369,7 @@ const ClerkDashboard = () => {
                 {voteData.length > 0 && (
                   <Button onClick={exportData} variant="outline">
                     <Download className="h-4 w-4 mr-2" />
-                    Export Data
+                    Export Real-time Data
                   </Button>
                 )}
                 <Button onClick={handleLogout} variant="outline">
@@ -336,7 +386,7 @@ const ClerkDashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center">
               <MapPin className="h-5 w-5 mr-2" />
-              Select Location to Monitor Votes
+              Select Location to Monitor Real-time Votes
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -394,44 +444,47 @@ const ClerkDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Location Statistics */}
+        {/* Real-time Location Statistics */}
         {location.county && locationStats && (
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <BarChart3 className="h-5 w-5 mr-2" />
-                Vote Statistics for {location.county}
+                Real-time Vote Statistics for {location.county}
                 {location.constituency && `, ${location.constituency}`}
                 {location.ward && `, ${location.ward}`}
+                <Badge variant={isRealTimeConnected ? "default" : "destructive"} className="ml-2">
+                  {isRealTimeConnected ? "LIVE UPDATES" : "OFFLINE"}
+                </Badge>
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <div className="text-2xl font-bold text-blue-600">{locationStats.totalVotes}</div>
-                  <div className="text-sm text-blue-500">Total Votes Cast</div>
+                  <div className="text-sm text-blue-500">Total Votes Cast (Live)</div>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg">
                   <div className="text-2xl font-bold text-green-600">{locationStats.voterTurnout}</div>
-                  <div className="text-sm text-green-500">Voter Participation</div>
+                  <div className="text-sm text-green-500">Voter Participation (Real-time)</div>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg">
                   <div className="text-sm font-medium text-purple-600">{locationStats.lastUpdated}</div>
-                  <div className="text-sm text-purple-500">Last Updated</div>
+                  <div className="text-sm text-purple-500">Last Updated (Auto-refresh)</div>
                 </div>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Vote Results */}
+        {/* Real-time Vote Results */}
         {location.county && (
           <div className="space-y-6">
             {loading ? (
               <Card>
                 <CardContent className="text-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p>Loading vote data from database...</p>
+                  <p>Loading real-time vote data from database...</p>
                 </CardContent>
               </Card>
             ) : (
@@ -445,11 +498,19 @@ const ClerkDashboard = () => {
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div>
-                          <CardTitle className="text-xl">{position}</CardTitle>
+                          <CardTitle className="text-xl flex items-center gap-2">
+                            {position}
+                            {isRealTimeConnected && (
+                              <Badge variant="outline" className="text-xs">
+                                <Radio className="h-3 w-3 mr-1 text-green-500" />
+                                Live
+                              </Badge>
+                            )}
+                          </CardTitle>
                           <CardDescription>
                             {location.ward && `${location.ward}, `}
                             {location.constituency && `${location.constituency}, `}
-                            {location.county}
+                            {location.county} - Real-time Results
                           </CardDescription>
                         </div>
                         <div className="text-right">
@@ -472,7 +533,7 @@ const ClerkDashboard = () => {
                             <TableRow>
                               <TableHead>Candidate</TableHead>
                               <TableHead>Party</TableHead>
-                              <TableHead className="text-right">Votes</TableHead>
+                              <TableHead className="text-right">Votes (Live)</TableHead>
                               <TableHead className="text-right">Percentage</TableHead>
                             </TableRow>
                           </TableHeader>
@@ -492,6 +553,9 @@ const ClerkDashboard = () => {
                                   </TableCell>
                                   <TableCell className={`text-right font-bold ${isLeading ? 'text-green-600' : ''}`}>
                                     {vote.votes}
+                                    {isRealTimeConnected && (
+                                      <span className="text-xs text-green-500 ml-1">●</span>
+                                    )}
                                   </TableCell>
                                   <TableCell className="text-right text-sm text-gray-500">
                                     {percentage}%
@@ -503,7 +567,8 @@ const ClerkDashboard = () => {
                         </Table>
                       ) : (
                         <div className="text-center py-8 text-gray-500">
-                          No votes recorded for this position in the selected location.
+                          <Radio className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                          No votes recorded yet for this position. Real-time monitoring active.
                         </div>
                       )}
                     </CardContent>
@@ -517,9 +582,15 @@ const ClerkDashboard = () => {
         {!location.county && (
           <Card>
             <CardContent className="text-center py-12">
-              <BarChart3 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-600 mb-2">Select Location to Monitor Votes</h3>
-              <p className="text-gray-500">Please select a county to view real-time voting data. All 47 counties available.</p>
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <BarChart3 className="h-16 w-16 text-gray-400" />
+                <Radio className={`h-8 w-8 ${isRealTimeConnected ? 'text-green-500' : 'text-red-500'}`} />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-600 mb-2">Select Location for Real-time Vote Monitoring</h3>
+              <p className="text-gray-500">
+                Please select a county to view live voting data. Real-time updates are {isRealTimeConnected ? 'active' : 'connecting'}...
+              </p>
+              <p className="text-sm text-gray-400 mt-2">All 47 counties available for monitoring</p>
             </CardContent>
           </Card>
         )}
