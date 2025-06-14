@@ -43,9 +43,9 @@ interface LocationVoteStats {
 
 const ClerkDashboard = () => {
   const [location, setLocation] = useState({
-    county: '',
-    constituency: '',
-    ward: ''
+    county: 'all',
+    constituency: 'all',
+    ward: 'all'
   });
   const [clerkData, setClerkData] = useState<ClerkData | null>(null);
   const [voteData, setVoteData] = useState<VoteData[]>([]);
@@ -60,12 +60,14 @@ const ClerkDashboard = () => {
   
   // Get constituencies for selected county
   const getConstituencies = (countyName: string) => {
+    if (countyName === 'all') return [];
     const county = COUNTIES.find(c => c.name === countyName);
     return county ? county.subcounties.map(sc => sc.name) : [];
   };
 
   // Get wards for selected constituency
   const getWards = (countyName: string, constituencyName: string) => {
+    if (countyName === 'all' || constituencyName === 'all') return [];
     const county = COUNTIES.find(c => c.name === countyName);
     if (!county) return [];
     const constituency = county.subcounties.find(sc => sc.name === constituencyName);
@@ -134,8 +136,8 @@ const ClerkDashboard = () => {
     setLocation(prev => ({
       ...prev,
       [field]: value,
-      ...(field === 'county' && { constituency: '', ward: '' }),
-      ...(field === 'constituency' && { ward: '' })
+      ...(field === 'county' && { constituency: 'all', ward: 'all' }),
+      ...(field === 'constituency' && { ward: 'all' })
     }));
   };
 
@@ -181,14 +183,14 @@ const ClerkDashboard = () => {
         'p1': { name: 'John Kamau', party: 'Democratic Alliance' },
         'p2': { name: 'Mary Wanjiku', party: 'Unity Party' },
         'p3': { name: 'David Otieno', party: 'Progressive Movement' },
-        'g1': { name: `Peter Mwangi (${location.county || 'County'})`, party: 'County First' },
-        'g2': { name: `Grace Akinyi (${location.county || 'County'})`, party: 'Development Party' },
-        'w1': { name: `Susan Njeri (${location.county || 'County'})`, party: 'Women First' },
-        'w2': { name: `Margaret Wambui (${location.county || 'County'})`, party: 'Equality Party' },
-        'm1': { name: `Robert Macharia (${location.constituency || location.county || 'Constituency'})`, party: 'Grassroots Party' },
-        'm2': { name: `Lucy Wambui (${location.constituency || location.county || 'Constituency'})`, party: 'Youth Movement' },
-        'c1': { name: `Francis Mutua (${location.ward || location.constituency || location.county || 'Ward'})`, party: 'Local Development' },
-        'c2': { name: `Catherine Wairimu (${location.ward || location.constituency || location.county || 'Ward'})`, party: 'Community First' }
+        'g1': { name: `Peter Mwangi (${location.county !== 'all' ? location.county : 'County'})`, party: 'County First' },
+        'g2': { name: `Grace Akinyi (${location.county !== 'all' ? location.county : 'County'})`, party: 'Development Party' },
+        'w1': { name: `Susan Njeri (${location.county !== 'all' ? location.county : 'County'})`, party: 'Women First' },
+        'w2': { name: `Margaret Wambui (${location.county !== 'all' ? location.county : 'County'})`, party: 'Equality Party' },
+        'm1': { name: `Robert Macharia (${location.constituency !== 'all' ? location.constituency : location.county !== 'all' ? location.county : 'Constituency'})`, party: 'Grassroots Party' },
+        'm2': { name: `Lucy Wambui (${location.constituency !== 'all' ? location.constituency : location.county !== 'all' ? location.county : 'Constituency'})`, party: 'Youth Movement' },
+        'c1': { name: `Francis Mutua (${location.ward !== 'all' ? location.ward : location.constituency !== 'all' ? location.constituency : location.county !== 'all' ? location.county : 'Ward'})`, party: 'Local Development' },
+        'c2': { name: `Catherine Wairimu (${location.ward !== 'all' ? location.ward : location.constituency !== 'all' ? location.constituency : location.county !== 'all' ? location.county : 'Ward'})`, party: 'Community First' }
       };
 
       const processedData: VoteData[] = [];
@@ -218,7 +220,7 @@ const ClerkDashboard = () => {
               candidate_name: candidate.name,
               party: candidate.party,
               votes: votes,
-              location: location.county ? `${location.county}${location.constituency ? `, ${location.constituency}` : ''}${location.ward ? `, ${location.ward}` : ''}` : 'All Locations'
+              location: location.county !== 'all' ? `${location.county}${location.constituency !== 'all' ? `, ${location.constituency}` : ''}${location.ward !== 'all' ? `, ${location.ward}` : ''}` : 'All Locations'
             });
           }
         });
@@ -281,7 +283,7 @@ const ClerkDashboard = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `real-time-vote-data-${location.county || 'all'}-${Date.now()}.csv`;
+    a.download = `real-time-vote-data-${location.county !== 'all' ? location.county : 'all'}-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
 
@@ -369,7 +371,7 @@ const ClerkDashboard = () => {
                     <SelectValue placeholder="All counties" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Counties</SelectItem>
+                    <SelectItem value="all">All Counties</SelectItem>
                     {counties.map((county) => (
                       <SelectItem key={county} value={county}>{county}</SelectItem>
                     ))}
@@ -382,13 +384,13 @@ const ClerkDashboard = () => {
                 <Select 
                   value={location.constituency} 
                   onValueChange={(value) => handleLocationChange('constituency', value)}
-                  disabled={!location.county}
+                  disabled={location.county === 'all'}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="All constituencies" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Constituencies</SelectItem>
+                    <SelectItem value="all">All Constituencies</SelectItem>
                     {getConstituencies(location.county).map((constituency) => (
                       <SelectItem key={constituency} value={constituency}>{constituency}</SelectItem>
                     ))}
@@ -401,13 +403,13 @@ const ClerkDashboard = () => {
                 <Select 
                   value={location.ward} 
                   onValueChange={(value) => handleLocationChange('ward', value)}
-                  disabled={!location.constituency}
+                  disabled={location.constituency === 'all'}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="All wards" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Wards</SelectItem>
+                    <SelectItem value="all">All Wards</SelectItem>
                     {getWards(location.county, location.constituency).map((ward) => (
                       <SelectItem key={ward} value={ward}>{ward}</SelectItem>
                     ))}
@@ -425,9 +427,9 @@ const ClerkDashboard = () => {
               <CardTitle className="flex items-center">
                 <BarChart3 className="h-5 w-5 mr-2" />
                 Real-time Vote Statistics
-                {location.county && ` for ${location.county}`}
-                {location.constituency && `, ${location.constituency}`}
-                {location.ward && `, ${location.ward}`}
+                {location.county !== 'all' && ` for ${location.county}`}
+                {location.constituency !== 'all' && `, ${location.constituency}`}
+                {location.ward !== 'all' && `, ${location.ward}`}
                 <Badge variant={isRealTimeConnected ? "default" : "destructive"} className="ml-2">
                   {isRealTimeConnected ? "LIVE UPDATES" : "OFFLINE"}
                 </Badge>
@@ -482,9 +484,9 @@ const ClerkDashboard = () => {
                           )}
                         </CardTitle>
                         <CardDescription>
-                          {location.ward && `${location.ward}, `}
-                          {location.constituency && `${location.constituency}, `}
-                          {location.county && `${location.county} - `}Real-time Results
+                          {location.ward !== 'all' && `${location.ward}, `}
+                          {location.constituency !== 'all' && `${location.constituency}, `}
+                          {location.county !== 'all' && `${location.county} - `}Real-time Results
                         </CardDescription>
                       </div>
                       <div className="text-right">
