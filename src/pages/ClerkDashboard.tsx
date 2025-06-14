@@ -106,10 +106,8 @@ const ClerkDashboard = () => {
             });
           }
           
-          // Refresh vote data when changes occur
-          if (location.county) {
-            loadVoteData();
-          }
+          // Refresh vote data immediately when changes occur
+          loadVoteData();
         }
       )
       .subscribe((status) => {
@@ -130,7 +128,7 @@ const ClerkDashboard = () => {
       supabase.removeChannel(channel);
       setIsRealTimeConnected(false);
     };
-  }, [location.county, toast]);
+  }, [toast]);
 
   const handleLocationChange = (field: string, value: string) => {
     setLocation(prev => ({
@@ -142,13 +140,11 @@ const ClerkDashboard = () => {
   };
 
   const loadVoteData = async () => {
-    if (!location.county) return;
-    
     setLoading(true);
     try {
-      console.log('Loading real-time vote data for location:', location);
+      console.log('Loading real-time vote data...');
 
-      // Fetch all votes from the database in real-time
+      // Fetch all votes from the database
       const { data: votes, error: votesError } = await supabase
         .from('votes')
         .select(`
@@ -157,7 +153,7 @@ const ClerkDashboard = () => {
           created_at,
           voter_id
         `)
-        .order('created_at', { ascending: false }); // Get most recent votes first
+        .order('created_at', { ascending: false });
 
       if (votesError) {
         console.error('Error fetching votes:', votesError);
@@ -169,54 +165,30 @@ const ClerkDashboard = () => {
         return;
       }
 
-      console.log('Fetched real-time votes from database:', votes?.length || 0, 'votes');
-
-      // Fetch voter data to get location information
-      const { data: voters, error: votersError } = await supabase
-        .from('voters')
-        .select('id, location_id');
-
-      if (votersError) {
-        console.error('Error fetching voters:', votersError);
-      }
-
-      console.log('Fetched voters:', voters?.length || 0, 'voters');
-
-      // Create a map of voter_id to location
-      const voterLocationMap = new Map();
-      voters?.forEach(voter => {
-        if (voter.location_id) {
-          voterLocationMap.set(voter.id, voter.location_id);
-        }
-      });
-
-      // For demo purposes, show all votes for any selected county
-      let filteredVotes = votes || [];
-      
-      console.log('Processing votes for display:', filteredVotes.length);
+      console.log('Fetched votes from database:', votes?.length || 0, 'votes');
 
       // Process vote data - group by position and candidate
       const votesByCandidate: { [key: string]: number } = {};
-      filteredVotes.forEach(vote => {
+      (votes || []).forEach(vote => {
         const key = `${vote.position_id}-${vote.candidate_id}`;
         votesByCandidate[key] = (votesByCandidate[key] || 0) + 1;
       });
 
-      console.log('Real-time votes by candidate:', votesByCandidate);
+      console.log('Votes by candidate:', votesByCandidate);
 
       // Create candidate information based on the database structure
       const candidateInfo: { [key: string]: { name: string; party: string } } = {
         'p1': { name: 'John Kamau', party: 'Democratic Alliance' },
         'p2': { name: 'Mary Wanjiku', party: 'Unity Party' },
         'p3': { name: 'David Otieno', party: 'Progressive Movement' },
-        'g1': { name: `Peter Mwangi (${location.county})`, party: 'County First' },
-        'g2': { name: `Grace Akinyi (${location.county})`, party: 'Development Party' },
-        'w1': { name: `Susan Njeri (${location.county})`, party: 'Women First' },
-        'w2': { name: `Margaret Wambui (${location.county})`, party: 'Equality Party' },
-        'm1': { name: `Robert Macharia (${location.constituency || location.county})`, party: 'Grassroots Party' },
-        'm2': { name: `Lucy Wambui (${location.constituency || location.county})`, party: 'Youth Movement' },
-        'c1': { name: `Francis Mutua (${location.ward || location.constituency || location.county})`, party: 'Local Development' },
-        'c2': { name: `Catherine Wairimu (${location.ward || location.constituency || location.county})`, party: 'Community First' }
+        'g1': { name: `Peter Mwangi (${location.county || 'County'})`, party: 'County First' },
+        'g2': { name: `Grace Akinyi (${location.county || 'County'})`, party: 'Development Party' },
+        'w1': { name: `Susan Njeri (${location.county || 'County'})`, party: 'Women First' },
+        'w2': { name: `Margaret Wambui (${location.county || 'County'})`, party: 'Equality Party' },
+        'm1': { name: `Robert Macharia (${location.constituency || location.county || 'Constituency'})`, party: 'Grassroots Party' },
+        'm2': { name: `Lucy Wambui (${location.constituency || location.county || 'Constituency'})`, party: 'Youth Movement' },
+        'c1': { name: `Francis Mutua (${location.ward || location.constituency || location.county || 'Ward'})`, party: 'Local Development' },
+        'c2': { name: `Catherine Wairimu (${location.ward || location.constituency || location.county || 'Ward'})`, party: 'Community First' }
       };
 
       const processedData: VoteData[] = [];
@@ -246,7 +218,7 @@ const ClerkDashboard = () => {
               candidate_name: candidate.name,
               party: candidate.party,
               votes: votes,
-              location: `${location.county}${location.constituency ? `, ${location.constituency}` : ''}${location.ward ? `, ${location.ward}` : ''}`
+              location: location.county ? `${location.county}${location.constituency ? `, ${location.constituency}` : ''}${location.ward ? `, ${location.ward}` : ''}` : 'All Locations'
             });
           }
         });
@@ -261,8 +233,8 @@ const ClerkDashboard = () => {
         lastUpdated: new Date().toLocaleString()
       });
 
-      console.log('Real-time processed vote data:', processedData.length, 'entries');
-      console.log('Real-time location stats:', { totalVotes: totalVotesCount });
+      console.log('Processed vote data:', processedData.length, 'entries');
+      console.log('Total votes counted:', totalVotesCount);
 
     } catch (error) {
       console.error('Error loading real-time vote data:', error);
@@ -276,10 +248,9 @@ const ClerkDashboard = () => {
     }
   };
 
+  // Load vote data when component mounts and when location changes
   useEffect(() => {
-    if (location.county) {
-      loadVoteData();
-    }
+    loadVoteData();
   }, [location]);
 
   const handleLogout = () => {
@@ -310,7 +281,7 @@ const ClerkDashboard = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `real-time-vote-data-${location.county}-${Date.now()}.csv`;
+    a.download = `real-time-vote-data-${location.county || 'all'}-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
 
@@ -386,7 +357,7 @@ const ClerkDashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center">
               <MapPin className="h-5 w-5 mr-2" />
-              Select Location to Monitor Real-time Votes
+              Select Location to Monitor Real-time Votes (Optional)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -395,9 +366,10 @@ const ClerkDashboard = () => {
                 <Label>County ({counties.length} counties)</Label>
                 <Select value={location.county} onValueChange={(value) => handleLocationChange('county', value)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select county" />
+                    <SelectValue placeholder="All counties" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">All Counties</SelectItem>
                     {counties.map((county) => (
                       <SelectItem key={county} value={county}>{county}</SelectItem>
                     ))}
@@ -413,9 +385,10 @@ const ClerkDashboard = () => {
                   disabled={!location.county}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select constituency" />
+                    <SelectValue placeholder="All constituencies" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">All Constituencies</SelectItem>
                     {getConstituencies(location.county).map((constituency) => (
                       <SelectItem key={constituency} value={constituency}>{constituency}</SelectItem>
                     ))}
@@ -431,9 +404,10 @@ const ClerkDashboard = () => {
                   disabled={!location.constituency}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select ward" />
+                    <SelectValue placeholder="All wards" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">All Wards</SelectItem>
                     {getWards(location.county, location.constituency).map((ward) => (
                       <SelectItem key={ward} value={ward}>{ward}</SelectItem>
                     ))}
@@ -445,12 +419,13 @@ const ClerkDashboard = () => {
         </Card>
 
         {/* Real-time Location Statistics */}
-        {location.county && locationStats && (
+        {locationStats && (
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <BarChart3 className="h-5 w-5 mr-2" />
-                Real-time Vote Statistics for {location.county}
+                Real-time Vote Statistics
+                {location.county && ` for ${location.county}`}
                 {location.constituency && `, ${location.constituency}`}
                 {location.ward && `, ${location.ward}`}
                 <Badge variant={isRealTimeConnected ? "default" : "destructive"} className="ml-2">
@@ -478,122 +453,104 @@ const ClerkDashboard = () => {
         )}
 
         {/* Real-time Vote Results */}
-        {location.county && (
-          <div className="space-y-6">
-            {loading ? (
-              <Card>
-                <CardContent className="text-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p>Loading real-time vote data from database...</p>
-                </CardContent>
-              </Card>
-            ) : (
-              ['President', 'Governor', 'Women Representative', 'Member of Parliament', 'Member of County Assembly'].map((position) => {
-                const positionVotes = getVotesByPosition(position);
-                const totalVotes = getTotalVotesForPosition(position);
-                const leadingCandidate = getLeadingCandidate(position);
+        <div className="space-y-6">
+          {loading ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p>Loading real-time vote data from database...</p>
+              </CardContent>
+            </Card>
+          ) : (
+            ['President', 'Governor', 'Women Representative', 'Member of Parliament', 'Member of County Assembly'].map((position) => {
+              const positionVotes = getVotesByPosition(position);
+              const totalVotes = getTotalVotesForPosition(position);
+              const leadingCandidate = getLeadingCandidate(position);
 
-                return (
-                  <Card key={position}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-xl flex items-center gap-2">
-                            {position}
-                            {isRealTimeConnected && (
-                              <Badge variant="outline" className="text-xs">
-                                <Radio className="h-3 w-3 mr-1 text-green-500" />
-                                Live
-                              </Badge>
-                            )}
-                          </CardTitle>
-                          <CardDescription>
-                            {location.ward && `${location.ward}, `}
-                            {location.constituency && `${location.constituency}, `}
-                            {location.county} - Real-time Results
-                          </CardDescription>
-                        </div>
-                        <div className="text-right">
-                          <div className="flex items-center space-x-2">
-                            <Users className="h-4 w-4 text-gray-500" />
-                            <span className="text-sm text-gray-600">Total Votes: {totalVotes}</span>
-                          </div>
-                          {leadingCandidate && (
-                            <Badge variant="secondary" className="mt-1">
-                              Leading: {leadingCandidate.candidate_name}
+              return (
+                <Card key={position}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-xl flex items-center gap-2">
+                          {position}
+                          {isRealTimeConnected && (
+                            <Badge variant="outline" className="text-xs">
+                              <Radio className="h-3 w-3 mr-1 text-green-500" />
+                              Live
                             </Badge>
                           )}
-                        </div>
+                        </CardTitle>
+                        <CardDescription>
+                          {location.ward && `${location.ward}, `}
+                          {location.constituency && `${location.constituency}, `}
+                          {location.county && `${location.county} - `}Real-time Results
+                        </CardDescription>
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      {positionVotes.length > 0 ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Candidate</TableHead>
-                              <TableHead>Party</TableHead>
-                              <TableHead className="text-right">Votes (Live)</TableHead>
-                              <TableHead className="text-right">Percentage</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {positionVotes.map((vote) => {
-                              const percentage = totalVotes > 0 ? (vote.votes / totalVotes * 100).toFixed(1) : '0.0';
-                              const isLeading = leadingCandidate?.candidate_id === vote.candidate_id;
-
-                              return (
-                                <TableRow key={vote.candidate_id}>
-                                  <TableCell className={`font-medium ${isLeading ? 'text-green-700' : ''}`}>
-                                    {vote.candidate_name}
-                                    {isLeading && <span className="ml-2">👑</span>}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline">{vote.party}</Badge>
-                                  </TableCell>
-                                  <TableCell className={`text-right font-bold ${isLeading ? 'text-green-600' : ''}`}>
-                                    {vote.votes}
-                                    {isRealTimeConnected && (
-                                      <span className="text-xs text-green-500 ml-1">●</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="text-right text-sm text-gray-500">
-                                    {percentage}%
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      ) : (
-                        <div className="text-center py-8 text-gray-500">
-                          <Radio className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                          No votes recorded yet for this position. Real-time monitoring active.
+                      <div className="text-right">
+                        <div className="flex items-center space-x-2">
+                          <Users className="h-4 w-4 text-gray-500" />
+                          <span className="text-sm text-gray-600">Total Votes: {totalVotes}</span>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })
-            )}
-          </div>
-        )}
+                        {leadingCandidate && totalVotes > 0 && (
+                          <Badge variant="secondary" className="mt-1">
+                            Leading: {leadingCandidate.candidate_name}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {positionVotes.length > 0 ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Candidate</TableHead>
+                            <TableHead>Party</TableHead>
+                            <TableHead className="text-right">Votes (Live)</TableHead>
+                            <TableHead className="text-right">Percentage</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {positionVotes.map((vote) => {
+                            const percentage = totalVotes > 0 ? (vote.votes / totalVotes * 100).toFixed(1) : '0.0';
+                            const isLeading = leadingCandidate?.candidate_id === vote.candidate_id && totalVotes > 0;
 
-        {!location.county && (
-          <Card>
-            <CardContent className="text-center py-12">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <BarChart3 className="h-16 w-16 text-gray-400" />
-                <Radio className={`h-8 w-8 ${isRealTimeConnected ? 'text-green-500' : 'text-red-500'}`} />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-600 mb-2">Select Location for Real-time Vote Monitoring</h3>
-              <p className="text-gray-500">
-                Please select a county to view live voting data. Real-time updates are {isRealTimeConnected ? 'active' : 'connecting'}...
-              </p>
-              <p className="text-sm text-gray-400 mt-2">All 47 counties available for monitoring</p>
-            </CardContent>
-          </Card>
-        )}
+                            return (
+                              <TableRow key={vote.candidate_id}>
+                                <TableCell className={`font-medium ${isLeading ? 'text-green-700' : ''}`}>
+                                  {vote.candidate_name}
+                                  {isLeading && <span className="ml-2">👑</span>}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline">{vote.party}</Badge>
+                                </TableCell>
+                                <TableCell className={`text-right font-bold ${isLeading ? 'text-green-600' : ''}`}>
+                                  {vote.votes}
+                                  {isRealTimeConnected && (
+                                    <span className="text-xs text-green-500 ml-1">●</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right text-sm text-gray-500">
+                                  {percentage}%
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <Radio className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                        No votes recorded yet for this position. Real-time monitoring active.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );
