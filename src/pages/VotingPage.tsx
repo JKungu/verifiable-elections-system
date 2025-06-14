@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -166,38 +167,37 @@ const VotingPage = () => {
       // Insert each vote with consistent IDs
       console.log('Starting vote insertion process...');
       
+      const votesToInsert = [];
       for (const [positionId, candidateId] of Object.entries(selections)) {
-        console.log(`Inserting vote for position: ${positionId}, candidate: ${candidateId}, voter: ${voterData.id}`);
+        console.log(`Preparing vote for position: ${positionId}, candidate: ${candidateId}, voter: ${voterData.id}`);
         
-        const voteData = {
-          position_id: positionId, // This now uses consistent numeric IDs (1, 2, 3, 4, 5)
+        votesToInsert.push({
+          position_id: positionId,
           candidate_id: candidateId,
           voter_id: voterData.id
-        };
-
-        console.log('Vote data to insert:', voteData);
-
-        const { data: insertedVote, error: voteError } = await supabase
-          .from('votes')
-          .insert(voteData)
-          .select()
-          .single();
-
-        if (voteError) {
-          console.error(`Error inserting vote for ${positionId}:`, voteError);
-          console.error('Vote error details:', {
-            message: voteError.message,
-            details: voteError.details,
-            hint: voteError.hint,
-            code: voteError.code
-          });
-          throw new Error(`Failed to save vote for ${positionId}: ${voteError.message}`);
-        }
-
-        console.log(`Successfully inserted vote for ${positionId}:`, insertedVote);
+        });
       }
 
-      console.log('All votes inserted successfully');
+      console.log('Votes to insert:', votesToInsert);
+
+      // Insert all votes at once
+      const { data: insertedVotes, error: voteError } = await supabase
+        .from('votes')
+        .insert(votesToInsert)
+        .select();
+
+      if (voteError) {
+        console.error('Error inserting votes:', voteError);
+        console.error('Vote error details:', {
+          message: voteError.message,
+          details: voteError.details,
+          hint: voteError.hint,
+          code: voteError.code
+        });
+        throw new Error(`Failed to save votes: ${voteError.message}`);
+      }
+
+      console.log('Successfully inserted votes:', insertedVotes);
 
       // Update voter status to has_voted = true
       console.log('Updating voter status...');
