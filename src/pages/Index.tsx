@@ -6,7 +6,7 @@ import { Shield, Lock, Eye, FileText } from 'lucide-react';
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:bg-gray-900 dark:from-gray-900 dark:to-gray-900 p-4">
       <div className="container mx-auto px-4 py-16">
         {/* Hero Section */}
         <div className="text-center mb-16">
@@ -19,7 +19,7 @@ const Index = () => {
           </p>
           <div className="space-x-4">
             <Link to="/voter-login">
-              <Button size="lg" className="px-8 py-3 bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600">
+              <Button size="lg" className="px-8 py-3 bg-white text-gray-900 hover:bg-gray-100 border border-gray-200">
                 Vote Now
               </Button>
             </Link>
@@ -89,7 +89,7 @@ const Index = () => {
             Join millions of Kenyans in shaping the future of our nation through secure digital voting.
           </p>
           <Link to="/voter-login">
-            <Button size="lg" className="px-8 py-3 bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600">
+            <Button size="lg" className="px-8 py-3 bg-white text-gray-900 hover:bg-gray-100 border border-gray-200">
               Start Voting Process
             </Button>
           </Link>
