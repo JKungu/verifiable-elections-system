@@ -164,9 +164,7 @@ const VotingPage = () => {
         return;
       }
 
-      // Insert each vote with consistent IDs
-      console.log('Starting vote insertion process...');
-      
+      // Prepare votes for insertion - THIS IS THE CRITICAL FIX
       const votesToInsert = [];
       for (const [positionId, candidateId] of Object.entries(selections)) {
         console.log(`Preparing vote for position: ${positionId}, candidate: ${candidateId}, voter: ${voterData.id}`);
@@ -180,7 +178,7 @@ const VotingPage = () => {
 
       console.log('Votes to insert:', votesToInsert);
 
-      // Insert all votes at once
+      // Insert all votes - CRITICAL: This must happen BEFORE updating voter status
       const { data: insertedVotes, error: voteError } = await supabase
         .from('votes')
         .insert(votesToInsert)
@@ -208,11 +206,15 @@ const VotingPage = () => {
 
       if (verifyError) {
         console.error('Error verifying votes:', verifyError);
+        throw new Error(`Failed to verify votes: ${verifyError.message}`);
       } else {
         console.log('Verification - Votes found in database:', verifyVotes);
+        if (!verifyVotes || verifyVotes.length === 0) {
+          throw new Error('Votes were not saved to database - verification failed');
+        }
       }
 
-      // Update voter status to has_voted = true
+      // ONLY update voter status AFTER successfully saving votes
       console.log('Updating voter status...');
       const { data: updatedVoter, error: voterUpdateError } = await supabase
         .from('voters')
