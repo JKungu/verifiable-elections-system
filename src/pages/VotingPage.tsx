@@ -28,7 +28,7 @@ interface VoteSelection {
 const VotingPage = () => {
   const [positions] = useState<Position[]>([
     {
-      id: '1', // Use numeric IDs that match what ClerkDashboard expects
+      id: '1',
       title: 'President of Kenya',
       candidates: [
         { id: '1', name: 'John Kamau', party: 'Democratic Alliance' },
@@ -136,13 +136,11 @@ const VotingPage = () => {
 
     setIsSubmitting(true);
     try {
-      console.log('=== STARTING VOTE SUBMISSION PROCESS ===');
-      console.log('Voter data received:', voterData);
-      console.log('Selections made:', selections);
-      console.log('Voter UUID for database operations:', voterData.id);
+      console.log('=== STARTING VOTE SUBMISSION ===');
+      console.log('Voter:', voterData);
+      console.log('Selections:', selections);
 
-      // Step 1: Verify voter exists and hasn't voted yet
-      console.log('STEP 1: Checking voter status in database...');
+      // First verify voter exists and hasn't voted yet
       const { data: existingVoter, error: voterCheckError } = await supabase
         .from('voters')
         .select('*')
@@ -150,15 +148,11 @@ const VotingPage = () => {
         .single();
 
       if (voterCheckError) {
-        console.error('CRITICAL ERROR: Cannot find voter in database:', voterCheckError);
-        console.error('Searched for voter with ID:', voterData.id);
-        throw new Error(`Voter verification failed: ${voterCheckError.message}`);
+        console.error('Voter verification failed:', voterCheckError);
+        throw new Error(`Voter not found: ${voterCheckError.message}`);
       }
 
-      console.log('SUCCESS: Found voter in database:', existingVoter);
-
       if (existingVoter?.has_voted) {
-        console.log('ABORT: Voter has already voted');
         toast({
           title: "Already Voted",
           description: "You have already cast your vote.",
@@ -168,110 +162,62 @@ const VotingPage = () => {
         return;
       }
 
-      // Step 2: Prepare and validate vote data
-      console.log('STEP 2: Preparing vote data for insertion...');
-      const votesToInsert = [];
-      
-      for (const [positionId, candidateId] of Object.entries(selections)) {
-        const voteRecord = {
-          position_id: positionId,
-          candidate_id: candidateId,
-          voter_id: voterData.id  // This MUST be the UUID from the voters table
-        };
-        
-        console.log(`Preparing vote: Position ${positionId} -> Candidate ${candidateId} for Voter ${voterData.id}`);
-        votesToInsert.push(voteRecord);
-      }
+      // Prepare vote records
+      const voteRecords = Object.entries(selections).map(([positionId, candidateId]) => ({
+        position_id: positionId,
+        candidate_id: candidateId,
+        voter_id: voterData.id
+      }));
 
-      console.log('All votes prepared for insertion:', votesToInsert);
-      console.log('Total votes to insert:', votesToInsert.length);
+      console.log('Vote records to insert:', voteRecords);
 
-      // Step 3: Insert votes with detailed error handling
-      console.log('STEP 3: Inserting votes into database...');
+      // Insert all votes in a single transaction
       const { data: insertedVotes, error: voteError } = await supabase
         .from('votes')
-        .insert(votesToInsert)
-        .select('*'); // Select all fields to see what was actually inserted
+        .insert(voteRecords)
+        .select();
 
       if (voteError) {
-        console.error('CRITICAL ERROR: Vote insertion failed:', voteError);
-        console.error('Vote error code:', voteError.code);
-        console.error('Vote error message:', voteError.message);
-        console.error('Vote error details:', voteError.details);
-        console.error('Vote error hint:', voteError.hint);
-        console.error('Failed to insert votes:', votesToInsert);
+        console.error('Vote insertion failed:', voteError);
         throw new Error(`Failed to save votes: ${voteError.message}`);
       }
 
-      console.log('SUCCESS: Votes inserted into database:', insertedVotes);
-      console.log('Number of votes successfully inserted:', insertedVotes?.length || 0);
+      console.log('Votes inserted successfully:', insertedVotes);
 
-      // Step 4: CRITICAL - Verify votes are actually in the database
-      console.log('STEP 4: Verifying votes were saved to database...');
-      const { data: verificationVotes, error: verifyError } = await supabase
+      // Verify all votes were actually saved
+      const { data: verifyVotes, error: verifyError } = await supabase
         .from('votes')
         .select('*')
         .eq('voter_id', voterData.id);
 
-      if (verifyError) {
-        console.error('ERROR: Could not verify votes in database:', verifyError);
-        throw new Error(`Vote verification failed: ${verifyError.message}`);
+      if (verifyError || !verifyVotes || verifyVotes.length !== voteRecords.length) {
+        console.error('Vote verification failed:', verifyError);
+        throw new Error('Votes were not properly saved to database');
       }
 
-      console.log('VERIFICATION RESULT: Votes found in database:', verificationVotes);
-      console.log('Number of votes verified in database:', verificationVotes?.length || 0);
+      console.log('All votes verified in database:', verifyVotes);
 
-      if (!verificationVotes || verificationVotes.length === 0) {
-        console.error('CRITICAL ERROR: No votes found in database after insertion!');
-        console.error('This means the insertion silently failed or was rolled back');
-        throw new Error('CRITICAL: Votes were not saved to database - insertion failed');
-      }
-
-      if (verificationVotes.length !== votesToInsert.length) {
-        console.error('PARTIAL FAILURE: Not all votes were saved!');
-        console.error('Expected votes:', votesToInsert.length);
-        console.error('Actual votes saved:', verificationVotes.length);
-        throw new Error(`Only ${verificationVotes.length} of ${votesToInsert.length} votes were saved`);
-      }
-
-      console.log('SUCCESS: All votes verified in database');
-
-      // Step 5: Now that votes are confirmed saved, update voter status
-      console.log('STEP 5: Updating voter status to has_voted=true...');
-      const { data: updatedVoter, error: voterUpdateError } = await supabase
+      // Only after votes are confirmed saved, mark voter as voted
+      const { error: voterUpdateError } = await supabase
         .from('voters')
         .update({ 
           has_voted: true,
           voted_at: new Date().toISOString()
         })
-        .eq('id', voterData.id)
-        .select()
-        .single();
+        .eq('id', voterData.id);
 
       if (voterUpdateError) {
-        console.error('ERROR: Failed to update voter status:', voterUpdateError);
-        // This is not critical since votes are already saved
-        console.log('WARNING: Votes are saved but voter status update failed');
-      } else {
-        console.log('SUCCESS: Voter status updated:', updatedVoter);
+        console.error('Failed to update voter status:', voterUpdateError);
+        // Votes are saved, so this is not critical
       }
 
-      // Step 6: Final verification
-      console.log('STEP 6: Final verification - checking complete state...');
-      const { data: finalCheck } = await supabase
-        .from('votes')
-        .select('*')
-        .eq('voter_id', voterData.id);
-
-      console.log('FINAL CHECK: Total votes in database for this voter:', finalCheck?.length || 0);
-      console.log('=== VOTE SUBMISSION COMPLETED SUCCESSFULLY ===');
+      console.log('=== VOTE SUBMISSION COMPLETED ===');
 
       toast({
         title: "Vote Submitted Successfully",
         description: "Thank you for participating in the election!",
       });
 
-      // Navigate to success page
       navigate('/vote-success', { 
         state: { 
           voter: voterData,
@@ -280,16 +226,10 @@ const VotingPage = () => {
       });
 
     } catch (error: any) {
-      console.error('=== CRITICAL VOTING ERROR ===');
-      console.error('Error type:', typeof error);
-      console.error('Error message:', error.message);
-      console.error('Full error object:', error);
-      console.error('Voter ID that failed:', voterData?.id);
-      console.error('Selections that failed:', selections);
-      
+      console.error('Vote submission failed:', error);
       toast({
         title: "Vote Submission Failed",
-        description: `Critical error: ${error.message}. Please contact support.`,
+        description: error.message || "An error occurred while submitting your vote.",
         variant: "destructive",
       });
     } finally {
