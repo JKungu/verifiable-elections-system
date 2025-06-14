@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,16 +27,16 @@ interface VoteSelection {
 const VotingPage = () => {
   const [positions] = useState<Position[]>([
     {
-      id: 'President',
+      id: '1', // Use numeric IDs that match what ClerkDashboard expects
       title: 'President of Kenya',
       candidates: [
-        { id: 'p1', name: 'John Kamau', party: 'Democratic Alliance' },
-        { id: 'p2', name: 'Mary Wanjiku', party: 'Unity Party' },
-        { id: 'p3', name: 'David Otieno', party: 'Progressive Movement' }
+        { id: '1', name: 'John Kamau', party: 'Democratic Alliance' },
+        { id: '2', name: 'Mary Wanjiku', party: 'Unity Party' },
+        { id: '3', name: 'David Otieno', party: 'Progressive Movement' }
       ]
     },
     {
-      id: 'Governor',
+      id: '2',
       title: 'Governor',
       candidates: [
         { id: 'g1', name: 'Peter Mwangi', party: 'County First' },
@@ -45,7 +44,7 @@ const VotingPage = () => {
       ]
     },
     {
-      id: 'Women Representative',
+      id: '3',
       title: 'Women Representative',
       candidates: [
         { id: 'w1', name: 'Susan Njeri', party: 'Women First' },
@@ -53,7 +52,7 @@ const VotingPage = () => {
       ]
     },
     {
-      id: 'Member of Parliament',
+      id: '4',
       title: 'Member of Parliament',
       candidates: [
         { id: 'm1', name: 'Robert Macharia', party: 'Grassroots Party' },
@@ -61,7 +60,7 @@ const VotingPage = () => {
       ]
     },
     {
-      id: 'Member of County Assembly',
+      id: '5',
       title: 'Member of County Assembly',
       candidates: [
         { id: 'c1', name: 'Francis Mutua', party: 'Local Development' },
@@ -164,14 +163,14 @@ const VotingPage = () => {
         return;
       }
 
-      // Insert each vote with a transaction-like approach
+      // Insert each vote with consistent IDs
       console.log('Starting vote insertion process...');
       
       for (const [positionId, candidateId] of Object.entries(selections)) {
         console.log(`Inserting vote for position: ${positionId}, candidate: ${candidateId}, voter: ${voterData.id}`);
         
         const voteData = {
-          position_id: positionId,
+          position_id: positionId, // This now uses consistent numeric IDs (1, 2, 3, 4, 5)
           candidate_id: candidateId,
           voter_id: voterData.id
         };
