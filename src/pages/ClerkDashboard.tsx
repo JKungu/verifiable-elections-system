@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,6 +35,12 @@ interface VoteData {
   location: string;
 }
 
+interface LocationVoteStats {
+  totalVotes: number;
+  voterTurnout: number;
+  lastUpdated: string;
+}
+
 const ClerkDashboard = () => {
   const [location, setLocation] = useState({
     county: '',
@@ -42,6 +49,7 @@ const ClerkDashboard = () => {
   });
   const [clerkData, setClerkData] = useState<ClerkData | null>(null);
   const [voteData, setVoteData] = useState<VoteData[]>([]);
+  const [locationStats, setLocationStats] = useState<LocationVoteStats | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -87,42 +95,84 @@ const ClerkDashboard = () => {
     
     setLoading(true);
     try {
-      // Build location filter based on selected location
-      let locationFilter = location.county;
-      if (location.constituency) {
-        locationFilter += `, ${location.constituency}`;
-      }
-      if (location.ward) {
-        locationFilter += `, ${location.ward}`;
-      }
+      console.log('Loading vote data for location:', location);
 
-      // Fetch votes from the database
-      const { data: votes, error } = await supabase
+      // Fetch all votes from the database
+      const { data: votes, error: votesError } = await supabase
         .from('votes')
         .select(`
           position_id,
           candidate_id,
-          created_at
+          created_at,
+          voter_id
         `);
 
-      if (error) {
-        console.error('Error fetching votes:', error);
+      if (votesError) {
+        console.error('Error fetching votes:', votesError);
         toast({
           title: "Error",
-          description: "Failed to load vote data",
+          description: "Failed to load vote data from database",
           variant: "destructive",
         });
         return;
       }
 
+      console.log('Fetched votes from database:', votes);
+
+      // Fetch voter data to get location information
+      const { data: voters, error: votersError } = await supabase
+        .from('voters')
+        .select('id, location_id');
+
+      if (votersError) {
+        console.error('Error fetching voters:', votersError);
+      }
+
+      console.log('Fetched voters:', voters);
+
+      // Create a map of voter_id to location
+      const voterLocationMap = new Map();
+      voters?.forEach(voter => {
+        if (voter.location_id) {
+          voterLocationMap.set(voter.id, voter.location_id);
+        }
+      });
+
+      // Filter votes by location if we have voter location data
+      let filteredVotes = votes || [];
+      if (voterLocationMap.size > 0) {
+        filteredVotes = votes?.filter(vote => {
+          if (!vote.voter_id) return false;
+          const voterLocation = voterLocationMap.get(vote.voter_id);
+          if (!voterLocation) return false;
+          
+          // Check if the voter's location matches our selected location
+          const locationParts = voterLocation.toLowerCase().split(',').map((part: string) => part.trim());
+          const selectedLocation = [
+            location.county.toLowerCase(),
+            location.constituency.toLowerCase(),
+            location.ward.toLowerCase()
+          ].filter(Boolean);
+          
+          // Check if any part of the selected location matches the voter's location
+          return selectedLocation.some(selected => 
+            locationParts.some(part => part.includes(selected) || selected.includes(part))
+          );
+        }) || [];
+      }
+
+      console.log('Filtered votes for location:', filteredVotes);
+
       // Process vote data - group by position and candidate
       const votesByCandidate: { [key: string]: number } = {};
-      votes?.forEach(vote => {
+      filteredVotes.forEach(vote => {
         const key = `${vote.position_id}-${vote.candidate_id}`;
         votesByCandidate[key] = (votesByCandidate[key] || 0) + 1;
       });
 
-      // Create structured vote data with sample candidate information
+      console.log('Votes by candidate:', votesByCandidate);
+
+      // Create candidate information based on the database structure
       const candidateInfo: { [key: string]: { name: string; party: string } } = {
         'p1': { name: 'John Kamau', party: 'Democratic Alliance' },
         'p2': { name: 'Mary Wanjiku', party: 'Unity Party' },
@@ -148,10 +198,13 @@ const ClerkDashboard = () => {
         { id: 'Member of County Assembly', candidates: ['c1', 'c2'] }
       ];
 
+      let totalVotesCount = 0;
+      
       positions.forEach(position => {
         position.candidates.forEach(candidateId => {
           const key = `${position.id}-${candidateId}`;
           const votes = votesByCandidate[key] || 0;
+          totalVotesCount += votes;
           const candidate = candidateInfo[candidateId];
           
           if (candidate) {
@@ -161,13 +214,24 @@ const ClerkDashboard = () => {
               candidate_name: candidate.name,
               party: candidate.party,
               votes: votes,
-              location: locationFilter
+              location: `${location.county}${location.constituency ? `, ${location.constituency}` : ''}${location.ward ? `, ${location.ward}` : ''}`
             });
           }
         });
       });
 
       setVoteData(processedData);
+
+      // Set location statistics
+      setLocationStats({
+        totalVotes: totalVotesCount,
+        voterTurnout: totalVotesCount, // In a real system, calculate this as percentage of registered voters
+        lastUpdated: new Date().toLocaleString()
+      });
+
+      console.log('Processed vote data:', processedData);
+      console.log('Location stats:', { totalVotes: totalVotesCount });
+
     } catch (error) {
       console.error('Error loading vote data:', error);
       toast({
@@ -216,6 +280,11 @@ const ClerkDashboard = () => {
     a.download = `vote-data-${location.county}-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+
+    toast({
+      title: "Export Complete",
+      description: "Vote data has been exported successfully.",
+    });
   };
 
   const getVotesByPosition = (position: string) => {
@@ -276,7 +345,7 @@ const ClerkDashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center">
               <MapPin className="h-5 w-5 mr-2" />
-              Select Location to View Results
+              Select Location to Monitor Votes
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -334,6 +403,36 @@ const ClerkDashboard = () => {
           </CardContent>
         </Card>
 
+        {/* Location Statistics */}
+        {location.county && locationStats && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <BarChart3 className="h-5 w-5 mr-2" />
+                Vote Statistics for {location.county}
+                {location.constituency && `, ${location.constituency}`}
+                {location.ward && `, ${location.ward}`}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">{locationStats.totalVotes}</div>
+                  <div className="text-sm text-blue-500">Total Votes Cast</div>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">{locationStats.voterTurnout}</div>
+                  <div className="text-sm text-green-500">Voter Participation</div>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <div className="text-sm font-medium text-purple-600">{locationStats.lastUpdated}</div>
+                  <div className="text-sm text-purple-500">Last Updated</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Vote Results */}
         {location.county && (
           <div className="space-y-6">
@@ -341,7 +440,7 @@ const ClerkDashboard = () => {
               <Card>
                 <CardContent className="text-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p>Loading vote data...</p>
+                  <p>Loading vote data from database...</p>
                 </CardContent>
               </Card>
             ) : (
@@ -428,8 +527,8 @@ const ClerkDashboard = () => {
           <Card>
             <CardContent className="text-center py-12">
               <BarChart3 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-600 mb-2">Select Location to View Results</h3>
-              <p className="text-gray-500">Please select a county to view voting results. All 47 counties available.</p>
+              <h3 className="text-lg font-semibold text-gray-600 mb-2">Select Location to Monitor Votes</h3>
+              <p className="text-gray-500">Please select a county to view real-time voting data. All 47 counties available.</p>
             </CardContent>
           </Card>
         )}
