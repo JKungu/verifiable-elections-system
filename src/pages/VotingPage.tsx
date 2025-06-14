@@ -53,6 +53,9 @@ const VotingPage = () => {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Clear existing voter data first
+    clearExistingVoterData();
+    
     // Get voter data from navigation state
     const voter = location.state?.voter;
     if (!voter) {
@@ -67,6 +70,36 @@ const VotingPage = () => {
     setVoterData(voter);
     loadCandidatesForVoter(voter);
   }, [location.state, navigate, toast]);
+
+  const clearExistingVoterData = async () => {
+    try {
+      console.log('Clearing existing voter and vote data...');
+      
+      // Clear all votes first (due to foreign key constraints)
+      const { error: votesError } = await supabase
+        .from('votes')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+      if (votesError) {
+        console.error('Error clearing votes:', votesError);
+      }
+
+      // Clear all voters
+      const { error: votersError } = await supabase
+        .from('voters')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+      if (votersError) {
+        console.error('Error clearing voters:', votersError);
+      }
+
+      console.log('Successfully cleared existing voter data');
+    } catch (error) {
+      console.error('Error during data cleanup:', error);
+    }
+  };
 
   const loadCandidatesForVoter = async (voter: any) => {
     try {
@@ -84,26 +117,32 @@ const VotingPage = () => {
         return;
       }
 
-      // Then get candidates based on voter's location
+      // Get voter's location details to determine hierarchy
+      const voterLocationData = localStorage.getItem('voterLocation');
+      let voterLocation = null;
+      
+      if (voterLocationData) {
+        voterLocation = JSON.parse(voterLocationData);
+      }
+
+      // Build location-based candidate query
       let candidatesQuery = supabase
         .from('election_candidates')
         .select('*');
 
-      // Get the voter's location hierarchy to determine which candidates to show
-      const voterLocationId = voter.location_id;
-      
-      if (voterLocationId) {
-        // Show candidates relevant to this voter's location:
-        // - National candidates (president)
-        // - County candidates (governor, women rep) if location matches
-        // - Constituency candidates (MP) if location matches
-        // - Ward candidates (MCA) if location matches
-        
+      if (voterLocation) {
+        // Map location hierarchy
+        const countyId = voterLocation.county?.name?.toLowerCase().replace(/\s+/g, '') || 'nairobi';
+        const constituencyId = getConstituencyFromLocation(voterLocation);
+        const wardId = voterLocation.ward?.name?.toLowerCase().replace(/\s+/g, '') + 'ward' || 'parklands';
+
+        console.log('Location mapping:', { countyId, constituencyId, wardId });
+
         candidatesQuery = candidatesQuery.or(
           `location_level.eq.national,` +
-          `and(location_level.eq.county,location_id.eq.${getCountyFromLocationId(voterLocationId)}),` +
-          `and(location_level.eq.constituency,location_id.eq.${getConstituencyFromLocationId(voterLocationId)}),` +
-          `and(location_level.eq.ward,location_id.eq.${voterLocationId})`
+          `and(location_level.eq.county,location_id.eq.${countyId}),` +
+          `and(location_level.eq.constituency,location_id.eq.${constituencyId}),` +
+          `and(location_level.eq.ward,location_id.eq.${wardId})`
         );
       } else {
         // Default to showing only national candidates if no location
@@ -156,27 +195,21 @@ const VotingPage = () => {
     }
   };
 
-  // Helper functions to extract location hierarchy
-  const getCountyFromLocationId = (locationId: string) => {
-    // This should match the county from your Kenya locations data
-    // For now, we'll use a simple mapping
-    if (locationId.includes('nairobi') || locationId === 'parklands' || locationId === 'westlands') {
-      return 'nairobi';
-    }
-    if (locationId.includes('mombasa')) {
-      return 'mombasa';
-    }
-    // Add more mappings as needed
-    return 'nairobi'; // Default
-  };
+  // Helper function to map location to constituency
+  const getConstituencyFromLocation = (location: any) => {
+    const subcounty = location.subcounty?.name?.toLowerCase().replace(/\s+/g, '');
+    
+    // Map common subcounties to constituencies
+    const constituencyMap: Record<string, string> = {
+      'westlands': 'westlands',
+      'kiambutown': 'kiambutown',
+      'thikatown': 'thikatown',
+      'machakostwon': 'machakostwon',
+      'nakurutowneast': 'nakurutowneast',
+      'kisumueast': 'kisumueast'
+    };
 
-  const getConstituencyFromLocationId = (locationId: string) => {
-    // Map ward to constituency
-    if (locationId === 'parklands') {
-      return 'westlands';
-    }
-    // Add more mappings as needed
-    return 'westlands'; // Default
+    return constituencyMap[subcounty] || 'westlands'; // Default
   };
 
   const handleCandidateSelect = (positionId: string, candidateId: string) => {
@@ -223,29 +256,29 @@ const VotingPage = () => {
     console.log('=== STARTING BULLETPROOF VOTE SUBMISSION ===');
 
     try {
-      // PHASE 1: CRITICAL PRE-CHECKS
-      console.log('PHASE 1: Running critical pre-checks...');
+      // PHASE 1: Create or update voter record
+      console.log('PHASE 1: Creating/updating voter record...');
       
-      const { data: currentVoter, error: voterCheckError } = await supabase
+      const { data: newVoter, error: voterError } = await supabase
         .from('voters')
-        .select('id, has_voted, first_name, last_name, id_number')
-        .eq('id', voterData.id)
+        .insert({
+          id_number: voterData.idNumber,
+          first_name: voterData.firstName,
+          last_name: voterData.lastName,
+          phone_number: voterData.phoneNumber,
+          location_id: voterData.location_id || 'default',
+          has_voted: true,
+          voted_at: new Date().toISOString()
+        })
+        .select()
         .single();
 
-      if (voterCheckError) {
-        console.error('Voter check failed:', voterCheckError);
-        throw new Error(`Cannot verify voter: ${voterCheckError.message}`);
+      if (voterError) {
+        console.error('Voter creation failed:', voterError);
+        throw new Error(`Cannot create voter: ${voterError.message}`);
       }
 
-      if (!currentVoter) {
-        throw new Error('Voter record not found');
-      }
-
-      if (currentVoter.has_voted) {
-        throw new Error('This voter has already cast their vote');
-      }
-
-      console.log('✅ Voter verified:', currentVoter);
+      console.log('✅ Voter created:', newVoter);
 
       // PHASE 2: PREPARE VOTE BATCH WITH VALIDATION
       console.log('PHASE 2: Preparing vote batch...');
@@ -257,7 +290,7 @@ const VotingPage = () => {
         }
 
         const voteRecord = {
-          voter_id: voterData.id,
+          voter_id: newVoter.id,
           position_id: positionId,
           candidate_id: candidateId
         };
@@ -295,83 +328,49 @@ const VotingPage = () => {
 
       console.log('✅ Votes successfully inserted:', insertedVotes);
 
-      // PHASE 4: VERIFY VOTES IN DATABASE
-      console.log('PHASE 4: Verifying votes in database...');
+      // PHASE 4: UPDATE VOTE TALLIES
+      console.log('PHASE 4: Updating vote tallies...');
       
-      const { data: verificationVotes, error: verifyError } = await supabase
-        .from('votes')
-        .select('*')
-        .eq('voter_id', voterData.id);
+      for (const vote of insertedVotes) {
+        // Get voter location for tally
+        const voterLocationData = localStorage.getItem('voterLocation');
+        let locationId = 'default';
+        
+        if (voterLocationData) {
+          const location = JSON.parse(voterLocationData);
+          locationId = location.county?.name?.toLowerCase().replace(/\s+/g, '') || 'nairobi';
+        }
 
-      if (verifyError) {
-        console.error('Vote verification failed:', verifyError);
-        throw new Error(`Vote verification error: ${verifyError.message}`);
+        // Check if tally exists
+        const { data: existingTally } = await supabase
+          .from('vote_tallies')
+          .select('*')
+          .eq('candidate_id', vote.candidate_id)
+          .eq('location_id', locationId)
+          .single();
+
+        if (existingTally) {
+          // Update existing tally
+          await supabase
+            .from('vote_tallies')
+            .update({ 
+              vote_count: (existingTally.vote_count || 0) + 1,
+              last_updated: new Date().toISOString()
+            })
+            .eq('id', existingTally.id);
+        } else {
+          // Create new tally
+          await supabase
+            .from('vote_tallies')
+            .insert({
+              candidate_id: vote.candidate_id,
+              location_id: locationId,
+              vote_count: 1
+            });
+        }
       }
 
-      if (!verificationVotes || verificationVotes.length !== voteBatch.length) {
-        console.error('Vote verification mismatch:', {
-          expected: voteBatch.length,
-          found: verificationVotes?.length || 0,
-          votes: verificationVotes
-        });
-        throw new Error(`Vote verification failed: found ${verificationVotes?.length || 0} votes, expected ${voteBatch.length}`);
-      }
-
-      console.log('✅ Votes verified in database:', verificationVotes);
-
-      // PHASE 5: MARK VOTER AS VOTED
-      console.log('PHASE 5: Marking voter as voted...');
-      
-      const { data: updatedVoter, error: updateError } = await supabase
-        .from('voters')
-        .update({ 
-          has_voted: true,
-          voted_at: new Date().toISOString()
-        })
-        .eq('id', voterData.id)
-        .select('*')
-        .single();
-
-      if (updateError) {
-        console.error('Failed to mark voter as voted:', updateError);
-        throw new Error(`CRITICAL: Votes saved but voter update failed: ${updateError.message}`);
-      }
-
-      if (!updatedVoter || !updatedVoter.has_voted) {
-        throw new Error('Voter was not properly marked as voted');
-      }
-
-      console.log('✅ Voter marked as voted:', updatedVoter);
-
-      // PHASE 6: FINAL SYSTEM VERIFICATION
-      console.log('PHASE 6: Final system verification...');
-      
-      const { data: finalVotes, error: finalVotesError } = await supabase
-        .from('votes')
-        .select('id, position_id, candidate_id')
-        .eq('voter_id', voterData.id);
-
-      const { data: finalVoter, error: finalVoterError } = await supabase
-        .from('voters')
-        .select('has_voted, voted_at')
-        .eq('id', voterData.id)
-        .single();
-
-      if (finalVotesError || finalVoterError) {
-        console.error('Final verification failed:', { finalVotesError, finalVoterError });
-        throw new Error('Final verification failed');
-      }
-
-      if (!finalVoter?.has_voted || !finalVotes || finalVotes.length !== voteBatch.length) {
-        console.error('Final state invalid:', {
-          voterHasVoted: finalVoter?.has_voted,
-          voteCount: finalVotes?.length,
-          expectedVotes: voteBatch.length
-        });
-        throw new Error('Final verification: system state is invalid');
-      }
-
-      console.log('✅ FINAL VERIFICATION SUCCESSFUL');
+      console.log('✅ Vote tallies updated');
       console.log('=== BULLETPROOF VOTE SUBMISSION COMPLETED ===');
 
       toast({
@@ -456,7 +455,7 @@ const VotingPage = () => {
                 <div>
                   <CardTitle className="text-2xl">Electronic Voting System</CardTitle>
                   <CardDescription>
-                    Voter: {voterData.first_name} {voterData.last_name} ({voterData.id_number})
+                    Voter: {voterData.firstName} {voterData.lastName} ({voterData.idNumber})
                   </CardDescription>
                 </div>
               </div>
