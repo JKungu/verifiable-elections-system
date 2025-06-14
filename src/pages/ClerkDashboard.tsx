@@ -165,39 +165,26 @@ const ClerkDashboard = () => {
 
     const readablePosition = positionMap[positionId] || positionId;
 
-    // Base candidate information with more candidates
+    // Updated candidate mapping to match the actual IDs being stored
     const candidateInfo: { [key: string]: { name: string; party: string } } = {
-      // Presidential candidates
+      // Presidential candidates (position 1)
       '1': { name: 'John Kamau', party: 'Democratic Alliance' },
       '2': { name: 'Mary Wanjiku', party: 'Unity Party' },
       '3': { name: 'David Otieno', party: 'Progressive Movement' },
       
-      // Governor candidates (county specific)
-      'gov-county-022-1': { name: 'Peter Mwangi', party: 'County First' },
-      'gov-county-022-2': { name: 'Grace Akinyi', party: 'Development Party' },
-      
-      // Women Representative candidates (county specific)
-      'wr-county-022-1': { name: 'Susan Njeri', party: 'Women First' },
-      'wr-county-022-2': { name: 'Margaret Wambui', party: 'Equality Party' },
-      
-      // MP candidates (constituency specific)
-      'mp-subcounty-111-1': { name: 'Robert Macharia', party: 'Grassroots Party' },
-      'mp-subcounty-111-2': { name: 'Lucy Wambui', party: 'Youth Movement' },
-      
-      // MCA candidates (ward specific)
-      'mca-ward-0547-1': { name: 'Francis Mutua', party: 'Local Development' },
-      'mca-ward-0547-2': { name: 'Catherine Wairimu', party: 'Community First' },
-      
-      // Additional fallback candidates for different IDs
-      'p1': { name: 'John Kamau', party: 'Democratic Alliance' },
-      'p2': { name: 'Mary Wanjiku', party: 'Unity Party' },
-      'p3': { name: 'David Otieno', party: 'Progressive Movement' },
+      // Governor candidates (position 2)
       'g1': { name: 'Peter Mwangi', party: 'County First' },
       'g2': { name: 'Grace Akinyi', party: 'Development Party' },
+      
+      // Women Representative candidates (position 3)
       'w1': { name: 'Susan Njeri', party: 'Women First' },
       'w2': { name: 'Margaret Wambui', party: 'Equality Party' },
+      
+      // MP candidates (position 4)
       'm1': { name: 'Robert Macharia', party: 'Grassroots Party' },
       'm2': { name: 'Lucy Wambui', party: 'Youth Movement' },
+      
+      // MCA candidates (position 5)
       'c1': { name: 'Francis Mutua', party: 'Local Development' },
       'c2': { name: 'Catherine Wairimu', party: 'Community First' }
     };
@@ -232,25 +219,6 @@ const ClerkDashboard = () => {
       console.log('Voters who have voted:', votersData);
       console.log('Voters table error:', votersError);
 
-      // Check ballots table
-      console.log('Checking ballots table...');
-      const { data: ballotsData, error: ballotsError } = await supabase
-        .from('ballots')
-        .select('*');
-      
-      console.log('Ballots table data:', ballotsData);
-      console.log('Ballots table error:', ballotsError);
-
-      // Check voter_ballots table
-      console.log('Checking voter_ballots table...');
-      const { data: voterBallotsData, error: voterBallotsError } = await supabase
-        .from('voter_ballots')
-        .select('*');
-      
-      console.log('Voter ballots table data:', voterBallotsData);
-      console.log('Voter ballots table error:', voterBallotsError);
-
-      // Use the votes table data if it exists, otherwise try to work with available data
       const votes = votesData || [];
       console.log('Processing votes:', votes);
 
@@ -260,7 +228,6 @@ const ClerkDashboard = () => {
         console.log('ISSUE FOUND: Voters have voted but no votes recorded in votes table');
         console.log(`Found ${votersData.length} voters who have voted, but 0 votes in votes table`);
         
-        // For now, show a message to the user about this data inconsistency
         toast({
           title: "Data Inconsistency Detected",
           description: `Found ${votersData.length} voters who have voted, but no vote records. This may indicate a database sync issue.`,
@@ -273,7 +240,7 @@ const ClerkDashboard = () => {
         setVoteData([]);
         setLocationStats({
           totalVotes: 0,
-          voterTurnout: votersData ? votersData.length : 0, // Show voter turnout even if votes aren't recorded properly
+          voterTurnout: votersData ? votersData.length : 0,
           lastUpdated: new Date().toLocaleString()
         });
         return;
@@ -292,32 +259,32 @@ const ClerkDashboard = () => {
 
       const processedData: VoteData[] = [];
       
-      // Define all possible positions and their candidates
+      // Define all possible positions and their candidates - updated to match VotingPage
       const positions = [
         { 
           id: 'President', 
           position_ids: ['1'], 
-          candidates: ['1', '2', '3', 'p1', 'p2', 'p3'] 
+          candidates: ['1', '2', '3'] // Updated to match VotingPage candidate IDs
         },
         { 
           id: 'Governor', 
           position_ids: ['2'], 
-          candidates: ['gov-county-022-1', 'gov-county-022-2', 'g1', 'g2'] 
+          candidates: ['g1', 'g2'] 
         },
         { 
           id: 'Women Representative', 
           position_ids: ['3'], 
-          candidates: ['wr-county-022-1', 'wr-county-022-2', 'w1', 'w2'] 
+          candidates: ['w1', 'w2'] 
         },
         { 
           id: 'Member of Parliament', 
           position_ids: ['4'], 
-          candidates: ['mp-subcounty-111-1', 'mp-subcounty-111-2', 'm1', 'm2'] 
+          candidates: ['m1', 'm2'] 
         },
         { 
           id: 'Member of County Assembly', 
           position_ids: ['5'], 
-          candidates: ['mca-ward-0547-1', 'mca-ward-0547-2', 'c1', 'c2'] 
+          candidates: ['c1', 'c2'] 
         }
       ];
 
@@ -356,7 +323,7 @@ const ClerkDashboard = () => {
       // Set location statistics
       setLocationStats({
         totalVotes: totalVotesCount,
-        voterTurnout: votersData ? votersData.length : totalVotesCount, // Use actual voter count if available
+        voterTurnout: votersData ? votersData.length : totalVotesCount,
         lastUpdated: new Date().toLocaleString()
       });
 
