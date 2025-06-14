@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -191,17 +190,12 @@ const ClerkDashboard = () => {
   const loadVoteData = async () => {
     setLoading(true);
     try {
-      console.log('Loading real-time vote data...');
+      console.log('Loading vote data from database...');
 
-      // Fetch all votes from the database - no location filtering at database level
+      // Fetch all votes from the database
       const { data: votes, error: votesError } = await supabase
         .from('votes')
-        .select(`
-          position_id,
-          candidate_id,
-          created_at,
-          voter_id
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (votesError) {
@@ -214,16 +208,27 @@ const ClerkDashboard = () => {
         return;
       }
 
-      console.log('Fetched votes from database:', votes?.length || 0, 'votes');
+      console.log('Raw votes from database:', votes);
+
+      if (!votes || votes.length === 0) {
+        console.log('No votes found in database');
+        setVoteData([]);
+        setLocationStats({
+          totalVotes: 0,
+          voterTurnout: 0,
+          lastUpdated: new Date().toLocaleString()
+        });
+        return;
+      }
 
       // Process vote data - group by position and candidate
       const votesByCandidate: { [key: string]: number } = {};
-      (votes || []).forEach(vote => {
+      votes.forEach(vote => {
         const key = `${vote.position_id}-${vote.candidate_id}`;
         votesByCandidate[key] = (votesByCandidate[key] || 0) + 1;
       });
 
-      console.log('Votes by candidate:', votesByCandidate);
+      console.log('Votes grouped by candidate:', votesByCandidate);
 
       const processedData: VoteData[] = [];
       
@@ -257,23 +262,23 @@ const ClerkDashboard = () => {
         });
       });
 
+      console.log('Processed vote data:', processedData);
+      console.log('Total votes counted:', totalVotesCount);
+
       setVoteData(processedData);
 
-      // Set location statistics with real-time data
+      // Set location statistics
       setLocationStats({
         totalVotes: totalVotesCount,
         voterTurnout: totalVotesCount,
         lastUpdated: new Date().toLocaleString()
       });
 
-      console.log('Processed vote data:', processedData.length, 'entries');
-      console.log('Total votes counted:', totalVotesCount);
-
     } catch (error) {
-      console.error('Error loading real-time vote data:', error);
+      console.error('Error loading vote data:', error);
       toast({
         title: "Error",
-        description: "Failed to load real-time vote data",
+        description: "Failed to load vote data",
         variant: "destructive",
       });
     } finally {
@@ -314,13 +319,13 @@ const ClerkDashboard = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `real-time-vote-data-${location.county !== 'all' ? location.county : 'all'}-${Date.now()}.csv`;
+    a.download = `vote-data-${location.county !== 'all' ? location.county : 'all'}-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
 
     toast({
       title: "Export Complete",
-      description: "Real-time vote data has been exported successfully.",
+      description: "Vote data has been exported successfully.",
     });
   };
 
@@ -356,7 +361,7 @@ const ClerkDashboard = () => {
                 </div>
                 <div>
                   <CardTitle className="text-2xl flex items-center gap-2">
-                    Real-time Clerk Dashboard
+                    Clerk Dashboard
                     <div className="flex items-center gap-1">
                       <Radio className={`h-4 w-4 ${isRealTimeConnected ? 'text-green-500' : 'text-red-500'}`} />
                       <span className={`text-sm ${isRealTimeConnected ? 'text-green-600' : 'text-red-600'}`}>
@@ -365,7 +370,7 @@ const ClerkDashboard = () => {
                     </div>
                   </CardTitle>
                   <CardDescription>
-                    Welcome, {clerkData.name} (Reg: {clerkData.registrationNumber}) - Monitoring live vote updates
+                    Welcome, {clerkData.name} (Reg: {clerkData.registrationNumber}) - Monitoring vote updates
                   </CardDescription>
                 </div>
               </div>
@@ -373,7 +378,7 @@ const ClerkDashboard = () => {
                 {voteData.length > 0 && (
                   <Button onClick={exportData} variant="outline">
                     <Download className="h-4 w-4 mr-2" />
-                    Export Real-time Data
+                    Export Data
                   </Button>
                 )}
                 <Button onClick={handleLogout} variant="outline">
@@ -390,7 +395,7 @@ const ClerkDashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center">
               <MapPin className="h-5 w-5 mr-2" />
-              Select Location to Monitor Real-time Votes (Optional)
+              Select Location to Filter Results (Optional)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -451,13 +456,13 @@ const ClerkDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Real-time Location Statistics */}
+        {/* Vote Statistics */}
         {locationStats && (
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <BarChart3 className="h-5 w-5 mr-2" />
-                Real-time Vote Statistics for {getLocationDisplayName()}
+                Vote Statistics for {getLocationDisplayName()}
                 <Badge variant={isRealTimeConnected ? "default" : "destructive"} className="ml-2">
                   {isRealTimeConnected ? "LIVE UPDATES" : "OFFLINE"}
                 </Badge>
@@ -467,28 +472,28 @@ const ClerkDashboard = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <div className="text-2xl font-bold text-blue-600">{locationStats.totalVotes}</div>
-                  <div className="text-sm text-blue-500">Total Votes Cast (Live)</div>
+                  <div className="text-sm text-blue-500">Total Votes Cast</div>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg">
                   <div className="text-2xl font-bold text-green-600">{locationStats.voterTurnout}</div>
-                  <div className="text-sm text-green-500">Voter Participation (Real-time)</div>
+                  <div className="text-sm text-green-500">Voter Participation</div>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg">
                   <div className="text-sm font-medium text-purple-600">{locationStats.lastUpdated}</div>
-                  <div className="text-sm text-purple-500">Last Updated (Auto-refresh)</div>
+                  <div className="text-sm text-purple-500">Last Updated</div>
                 </div>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Real-time Vote Results */}
+        {/* Vote Results */}
         <div className="space-y-6">
           {loading ? (
             <Card>
               <CardContent className="text-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p>Loading real-time vote data from database...</p>
+                <p>Loading vote data from database...</p>
               </CardContent>
             </Card>
           ) : (
@@ -512,7 +517,7 @@ const ClerkDashboard = () => {
                           )}
                         </CardTitle>
                         <CardDescription>
-                          {getLocationDisplayName()} - Real-time Results
+                          {getLocationDisplayName()} - Results
                         </CardDescription>
                       </div>
                       <div className="text-right">
@@ -535,7 +540,7 @@ const ClerkDashboard = () => {
                           <TableRow>
                             <TableHead>Candidate</TableHead>
                             <TableHead>Party</TableHead>
-                            <TableHead className="text-right">Votes (Live)</TableHead>
+                            <TableHead className="text-right">Votes</TableHead>
                             <TableHead className="text-right">Percentage</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -555,7 +560,7 @@ const ClerkDashboard = () => {
                                 </TableCell>
                                 <TableCell className={`text-right font-bold ${isLeading ? 'text-green-600' : ''}`}>
                                   {vote.votes}
-                                  {isRealTimeConnected && (
+                                  {isRealTimeConnected && vote.votes > 0 && (
                                     <span className="text-xs text-green-500 ml-1">●</span>
                                   )}
                                 </TableCell>
@@ -570,7 +575,7 @@ const ClerkDashboard = () => {
                     ) : (
                       <div className="text-center py-8 text-gray-500">
                         <Radio className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                        No votes recorded yet for this position. Real-time monitoring active.
+                        No votes recorded yet for this position. Monitoring for updates.
                       </div>
                     )}
                   </CardContent>
