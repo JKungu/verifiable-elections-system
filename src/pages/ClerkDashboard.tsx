@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -435,10 +436,10 @@ const ClerkDashboard = () => {
               {position.id}
             </CardTitle>
             <div className="flex gap-2">
-              <Badge variant="outline" className="bg-blue-50">
+              <Badge variant="outline" className="dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200">
                 Turnout: {totalVotes}
               </Badge>
-              <Badge variant="outline" className="bg-green-50">
+              <Badge variant="outline" className="dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200">
                 {sortedVotes.length} Candidates
               </Badge>
             </div>
@@ -448,12 +449,12 @@ const ClerkDashboard = () => {
           {sortedVotes.length > 0 ? (
             <Table>
               <TableHeader>
-                <TableRow className="bg-gray-50">
-                  <TableHead className="font-semibold">Candidate</TableHead>
-                  <TableHead className="font-semibold">Party</TableHead>
-                  <TableHead className="font-semibold text-center">Votes</TableHead>
-                  <TableHead className="font-semibold text-center">Percentage</TableHead>
-                  <TableHead className="font-semibold text-center">Status</TableHead>
+                <TableRow className="dark:bg-gray-800 hover:dark:bg-gray-700 border-b dark:border-gray-700">
+                  <TableHead className="font-semibold dark:text-gray-200">Candidate</TableHead>
+                  <TableHead className="font-semibold dark:text-gray-200">Party</TableHead>
+                  <TableHead className="font-semibold text-center dark:text-gray-200">Votes</TableHead>
+                  <TableHead className="font-semibold text-center dark:text-gray-200">Percentage</TableHead>
+                  <TableHead className="font-semibold text-center dark:text-gray-200">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -462,7 +463,7 @@ const ClerkDashboard = () => {
                   const isLeading = index === 0 && totalVotes > 0;
                   
                   return (
-                    <TableRow key={vote.candidate_id} className={isLeading ? 'bg-green-50' : ''}>
+                    <TableRow key={vote.candidate_id} className={`hover:dark:bg-gray-800 border-b dark:border-gray-700 ${isLeading ? 'dark:bg-green-900/20' : 'dark:bg-transparent'}`}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           {isLeading && <span className="text-lg">🏆</span>}
@@ -470,27 +471,27 @@ const ClerkDashboard = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200">
                           {vote.party}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        <span className={`font-bold ${isLeading ? 'text-green-600' : ''}`}>
+                        <span className={`font-bold ${isLeading ? 'text-green-400' : ''}`}>
                           {vote.votes.toLocaleString()}
                         </span>
                       </TableCell>
                       <TableCell className="text-center">
-                        <span className={`font-medium ${isLeading ? 'text-green-600' : ''}`}>
+                        <span className={`font-medium ${isLeading ? 'text-green-400' : ''}`}>
                           {percentage.toFixed(1)}%
                         </span>
                       </TableCell>
                       <TableCell className="text-center">
                         {isLeading ? (
-                          <Badge className="bg-green-100 text-green-800 border-green-200">
+                          <Badge className="bg-green-800 text-green-200 border-green-700 hover:bg-green-700">
                             Leading
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="text-gray-600">
+                          <Badge variant="outline" className="dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400">
                             #{index + 1}
                           </Badge>
                         )}
@@ -639,10 +640,10 @@ const ClerkDashboard = () => {
                 <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-2xl font-bold text-blue-600">
+                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                         {voterStats.totalRegistered.toLocaleString()}
                       </div>
-                      <div className="text-sm text-blue-500">Registered Voters</div>
+                      <div className="text-sm text-blue-500 dark:text-blue-300">Registered Voters</div>
                     </div>
                     <Users className="h-8 w-8 text-blue-400" />
                   </div>
@@ -651,10 +652,10 @@ const ClerkDashboard = () => {
                 <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-2xl font-bold text-green-600">
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                         {voterStats.totalVoted.toLocaleString()}
                       </div>
-                      <div className="text-sm text-green-500">Voters Participated</div>
+                      <div className="text-sm text-green-500 dark:text-green-300">Voters Participated</div>
                     </div>
                     <Vote className="h-8 w-8 text-green-400" />
                   </div>
@@ -663,10 +664,10 @@ const ClerkDashboard = () => {
                 <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-2xl font-bold text-purple-600">
+                      <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                         {voterStats.turnoutPercentage.toFixed(1)}%
                       </div>
-                      <div className="text-sm text-purple-500">Voter Turnout</div>
+                      <div className="text-sm text-purple-500 dark:text-purple-300">Voter Turnout</div>
                     </div>
                     <TrendingUp className="h-8 w-8 text-purple-400" />
                   </div>
@@ -675,10 +676,10 @@ const ClerkDashboard = () => {
                 <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-2xl font-bold text-orange-600">
+                      <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                         {getTotalVotesAcrossAllPositions().toLocaleString()}
                       </div>
-                      <div className="text-sm text-orange-500">Total Votes Cast</div>
+                      <div className="text-sm text-orange-500 dark:text-orange-300">Total Votes Cast</div>
                     </div>
                     <Vote className="h-8 w-8 text-orange-400" />
                   </div>
@@ -702,15 +703,15 @@ const ClerkDashboard = () => {
                 const leader = positionVotes.sort((a, b) => b.votes - a.votes)[0];
                 
                 return (
-                  <div key={position.id} className="bg-gray-50 p-4 rounded-lg">
+                  <div key={position.id} className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-lg">{position.icon}</span>
                       <div className="text-sm font-medium">{position.id}</div>
                     </div>
-                    <div className="text-xs text-gray-600 mb-1">
+                    <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
                       Leading: {leader?.candidate_name || 'None'}
                     </div>
-                    <div className="text-lg font-bold text-blue-600">
+                    <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
                       {totalVotes.toLocaleString()} votes
                     </div>
                   </div>
