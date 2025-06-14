@@ -136,42 +136,90 @@ const VotingPage = () => {
 
     setIsSubmitting(true);
     try {
-      console.log('Submitting votes for voter:', voterData.id);
+      console.log('=== STARTING VOTE SUBMISSION ===');
+      console.log('Voter data:', voterData);
       console.log('Vote selections:', selections);
 
-      // Insert votes into the votes table
-      const votePromises = Object.entries(selections).map(async ([positionId, candidateId]) => {
-        const { error } = await supabase
-          .from('votes')
-          .insert({
-            position_id: positionId,
-            candidate_id: candidateId,
-            voter_id: voterData.id
-          });
+      // First, let's check if the voter has already voted
+      const { data: existingVoter, error: voterCheckError } = await supabase
+        .from('voters')
+        .select('has_voted, id')
+        .eq('id', voterData.id)
+        .single();
 
-        if (error) {
-          console.error(`Error inserting vote for ${positionId}:`, error);
-          throw error;
+      if (voterCheckError) {
+        console.error('Error checking voter status:', voterCheckError);
+        throw voterCheckError;
+      }
+
+      console.log('Voter check result:', existingVoter);
+
+      if (existingVoter.has_voted) {
+        toast({
+          title: "Already Voted",
+          description: "You have already cast your vote.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Insert each vote individually with proper error handling
+      const voteInsertPromises = Object.entries(selections).map(async ([positionId, candidateId]) => {
+        console.log(`Inserting vote for position: ${positionId}, candidate: ${candidateId}, voter: ${voterData.id}`);
+        
+        const voteData = {
+          position_id: positionId,
+          candidate_id: candidateId,
+          voter_id: voterData.id
+        };
+
+        console.log('Vote data to insert:', voteData);
+
+        const { data: insertedVote, error: voteError } = await supabase
+          .from('votes')
+          .insert(voteData)
+          .select()
+          .single();
+
+        if (voteError) {
+          console.error(`Error inserting vote for ${positionId}:`, voteError);
+          console.error('Vote error details:', {
+            message: voteError.message,
+            details: voteError.details,
+            hint: voteError.hint,
+            code: voteError.code
+          });
+          throw voteError;
         }
+
+        console.log(`Successfully inserted vote for ${positionId}:`, insertedVote);
+        return insertedVote;
       });
 
-      await Promise.all(votePromises);
+      console.log('Waiting for all vote insertions to complete...');
+      const insertedVotes = await Promise.all(voteInsertPromises);
+      console.log('All votes inserted successfully:', insertedVotes);
 
-      // Update voter status
-      const { error: voterUpdateError } = await supabase
+      // Update voter status to has_voted = true
+      console.log('Updating voter status...');
+      const { data: updatedVoter, error: voterUpdateError } = await supabase
         .from('voters')
         .update({ 
           has_voted: true,
           voted_at: new Date().toISOString()
         })
-        .eq('id', voterData.id);
+        .eq('id', voterData.id)
+        .select()
+        .single();
 
       if (voterUpdateError) {
         console.error('Error updating voter status:', voterUpdateError);
         throw voterUpdateError;
       }
 
-      console.log('All votes submitted successfully');
+      console.log('Voter status updated successfully:', updatedVoter);
+      console.log('=== VOTE SUBMISSION COMPLETED SUCCESSFULLY ===');
 
       toast({
         title: "Vote Submitted Successfully",
@@ -187,10 +235,14 @@ const VotingPage = () => {
       });
 
     } catch (error) {
-      console.error('Error submitting votes:', error);
+      console.error('=== ERROR DURING VOTE SUBMISSION ===');
+      console.error('Full error object:', error);
+      console.error('Error message:', error.message);
+      console.error('Error details:', error.details);
+      
       toast({
         title: "Submission Failed",
-        description: "There was an error submitting your vote. Please try again.",
+        description: `There was an error submitting your vote: ${error.message}. Please try again.`,
         variant: "destructive",
       });
     } finally {
