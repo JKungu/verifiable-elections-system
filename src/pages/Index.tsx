@@ -18,14 +18,14 @@ const Index = () => {
             Secure, anonymous, and verifiable elections at your fingertips.
           </p>
           <div className="space-x-4">
-            <Link to="/register">
+            <Link to="/voter-login">
               <Button size="lg" className="px-8 py-3">
-                Get Started
+                Vote Now
               </Button>
             </Link>
-            <Link to="/login">
+            <Link to="/clerk-login">
               <Button variant="outline" size="lg" className="px-8 py-3">
-                Sign In
+                Clerk Login
               </Button>
             </Link>
           </div>
@@ -40,7 +40,7 @@ const Index = () => {
             </CardHeader>
             <CardContent>
               <CardDescription>
-                Multi-factor authentication with digital ID and Mobile-ID support
+                ID-based verification system for secure voter authentication
               </CardDescription>
             </CardContent>
           </Card>
@@ -48,7 +48,7 @@ const Index = () => {
           <Card>
             <CardHeader>
               <Lock className="h-12 w-12 text-green-600 mb-4" />
-              <CardTitle>End-to-End Encryption</CardTitle>
+              <CardTitle>Anonymous Voting</CardTitle>
             </CardHeader>
             <CardContent>
               <CardDescription>
@@ -76,7 +76,7 @@ const Index = () => {
             </CardHeader>
             <CardContent>
               <CardDescription>
-                Blockchain-style logging ensures complete election integrity
+                Complete election integrity with detailed audit trails
               </CardDescription>
             </CardContent>
           </Card>
@@ -90,9 +90,9 @@ const Index = () => {
               <div className="bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl font-bold text-blue-600">1</span>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Register & Verify</h3>
+              <h3 className="text-xl font-semibold mb-2">Enter ID Details</h3>
               <p className="text-gray-600">
-                Create your account with national ID and complete identity verification
+                Use your national ID number and personal details to access the voting system
               </p>
             </div>
             <div className="text-center">
@@ -101,7 +101,7 @@ const Index = () => {
               </div>
               <h3 className="text-xl font-semibold mb-2">Cast Your Vote</h3>
               <p className="text-gray-600">
-                Securely vote online with encrypted ballot submission
+                Select your location and securely vote for your preferred candidates
               </p>
             </div>
             <div className="text-center">
