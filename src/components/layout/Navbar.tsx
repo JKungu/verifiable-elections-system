@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const Navbar = () => {
   const { user, citizen, signOut, isElectionAuthority, isSystemAuditor } = useAuth();
@@ -72,16 +73,11 @@ const Navbar = () => {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+
+                <ThemeToggle />
               </>
             ) : (
-              <div className="space-x-2">
-                <Link to="/login">
-                  <Button variant="ghost">Sign In</Button>
-                </Link>
-                <Link to="/register">
-                  <Button>Register</Button>
-                </Link>
-              </div>
+              <ThemeToggle />
             )}
           </div>
         </div>
