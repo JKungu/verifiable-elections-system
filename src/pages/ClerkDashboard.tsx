@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, BarChart3, Users, LogOut, Shield, Download, Radio } from 'lucide-react';
+import { MapPin, BarChart3, Users, LogOut, Shield, Download, Radio, Vote } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { COUNTIES } from '@/data/kenyaLocations';
@@ -37,7 +38,14 @@ interface VoteData {
 interface LocationVoteStats {
   totalVotes: number;
   voterTurnout: number;
+  registeredVoters: number;
   lastUpdated: string;
+}
+
+interface LocationVoterData {
+  totalRegistered: number;
+  totalVoted: number;
+  turnoutPercentage: number;
 }
 
 const ClerkDashboard = () => {
@@ -49,6 +57,7 @@ const ClerkDashboard = () => {
   const [clerkData, setClerkData] = useState<ClerkData | null>(null);
   const [voteData, setVoteData] = useState<VoteData[]>([]);
   const [locationStats, setLocationStats] = useState<LocationVoteStats | null>(null);
+  const [voterStats, setVoterStats] = useState<LocationVoterData | null>(null);
   const [loading, setLoading] = useState(false);
   const [isRealTimeConnected, setIsRealTimeConnected] = useState(false);
   const navigate = useNavigate();
@@ -83,50 +92,67 @@ const ClerkDashboard = () => {
     setClerkData(JSON.parse(storedClerkData));
   }, [navigate]);
 
-  // Set up real-time subscription for votes
+  // Set up real-time subscription for votes and voters
   useEffect(() => {
-    console.log('Setting up real-time subscription for votes...');
+    console.log('Setting up real-time subscriptions...');
     
-    const channel = supabase
+    const votesChannel = supabase
       .channel('votes-realtime')
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          event: '*',
           schema: 'public',
           table: 'votes'
         },
         (payload) => {
           console.log('Real-time vote update received:', payload);
-          
-          // Show toast notification for new votes
-          if (payload.eventType === 'INSERT') {
-            toast({
-              title: "New Vote Cast",
-              description: `Vote received for ${payload.new.position_id}`,
-            });
-          }
-          
-          // Refresh vote data immediately when changes occur
+          toast({
+            title: "New Vote Cast",
+            description: `Vote recorded for ${payload.new?.position_id || 'position'}`,
+          });
           loadVoteData();
         }
       )
       .subscribe((status) => {
-        console.log('Real-time subscription status:', status);
+        console.log('Votes subscription status:', status);
         setIsRealTimeConnected(status === 'SUBSCRIBED');
-        
-        if (status === 'SUBSCRIBED') {
-          toast({
-            title: "Real-time Connected",
-            description: "Live vote updates are now active",
-          });
-        }
       });
 
-    // Cleanup subscription on unmount
+    const votersChannel = supabase
+      .channel('voters-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'voters'
+        },
+        (payload) => {
+          console.log('Real-time voter update received:', payload);
+          if (payload.eventType === 'UPDATE' && payload.new?.has_voted) {
+            toast({
+              title: "Voter Registered",
+              description: `${payload.new.first_name} ${payload.new.last_name} has voted`,
+            });
+          }
+          loadVoterData();
+        }
+      )
+      .subscribe();
+
+    if (isRealTimeConnected) {
+      toast({
+        title: "Real-time Connected",
+        description: "Live updates are now active for votes and voters",
+      });
+    }
+
+    // Cleanup subscriptions on unmount
     return () => {
-      console.log('Cleaning up real-time subscription');
-      supabase.removeChannel(channel);
+      console.log('Cleaning up real-time subscriptions');
+      supabase.removeChannel(votesChannel);
+      supabase.removeChannel(votersChannel);
       setIsRealTimeConnected(false);
     };
   }, [toast]);
@@ -153,19 +179,42 @@ const ClerkDashboard = () => {
     return displayName;
   };
 
+  const getLocationFilter = () => {
+    if (location.county === 'all') return null;
+    
+    // Find the ward ID for the selected location
+    if (location.ward !== 'all') {
+      const county = COUNTIES.find(c => c.name === location.county);
+      if (county) {
+        const constituency = county.subcounties.find(sc => sc.name === location.constituency);
+        if (constituency) {
+          const ward = constituency.wards.find(w => w.name === location.ward);
+          return ward?.id || null;
+        }
+      }
+    }
+    
+    // If no specific ward, but constituency is selected, get all wards in that constituency
+    if (location.constituency !== 'all') {
+      const county = COUNTIES.find(c => c.name === location.county);
+      if (county) {
+        const constituency = county.subcounties.find(sc => sc.name === location.constituency);
+        if (constituency) {
+          return constituency.wards.map(w => w.id);
+        }
+      }
+    }
+    
+    // If only county is selected, get all wards in that county
+    const county = COUNTIES.find(c => c.name === location.county);
+    if (county) {
+      return county.subcounties.flatMap(sc => sc.wards.map(w => w.id));
+    }
+    
+    return null;
+  };
+
   const getCandidateDisplayName = (candidateId: string, positionId: string) => {
-    // Map position names to readable format
-    const positionMap: { [key: string]: string } = {
-      '1': 'President',
-      '2': 'Governor', 
-      '3': 'Women Representative',
-      '4': 'Member of Parliament',
-      '5': 'Member of County Assembly'
-    };
-
-    const readablePosition = positionMap[positionId] || positionId;
-
-    // Updated candidate mapping to match the actual IDs being stored
     const candidateInfo: { [key: string]: { name: string; party: string } } = {
       // Presidential candidates (position 1)
       '1': { name: 'John Kamau', party: 'Democratic Alliance' },
@@ -195,76 +244,76 @@ const ClerkDashboard = () => {
     return { name: candidate.name, party: candidate.party };
   };
 
+  const loadVoterData = async () => {
+    try {
+      console.log('Loading voter data for location:', getLocationDisplayName());
+      
+      let query = supabase.from('voters').select('*');
+      
+      const locationFilter = getLocationFilter();
+      if (locationFilter) {
+        if (Array.isArray(locationFilter)) {
+          query = query.in('location_id', locationFilter);
+        } else {
+          query = query.eq('location_id', locationFilter);
+        }
+      }
+
+      const { data: allVoters, error: allError } = await query;
+      const { data: votedVoters, error: votedError } = await query.eq('has_voted', true);
+
+      if (allError || votedError) {
+        console.error('Error loading voter data:', allError || votedError);
+        return;
+      }
+
+      const totalRegistered = allVoters?.length || 0;
+      const totalVoted = votedVoters?.length || 0;
+      const turnoutPercentage = totalRegistered > 0 ? (totalVoted / totalRegistered * 100) : 0;
+
+      setVoterStats({
+        totalRegistered,
+        totalVoted,
+        turnoutPercentage
+      });
+
+      console.log(`Voter stats for ${getLocationDisplayName()}: ${totalVoted}/${totalRegistered} (${turnoutPercentage.toFixed(1)}%)`);
+
+    } catch (error) {
+      console.error('Error loading voter data:', error);
+    }
+  };
+
   const loadVoteData = async () => {
     setLoading(true);
     try {
-      console.log('=== DEBUGGING VOTE DATA LOADING ===');
+      console.log('Loading vote data for location:', getLocationDisplayName());
 
-      // Check the votes table first
-      console.log('Checking votes table...');
-      const { data: votesData, error: votesError } = await supabase
+      const { data: votes, error } = await supabase
         .from('votes')
         .select('*');
-      
-      console.log('Votes table data:', votesData);
-      console.log('Votes table error:', votesError);
 
-      // Check the voters table to see who has voted
-      console.log('Checking voters table...');
-      const { data: votersData, error: votersError } = await supabase
-        .from('voters')
-        .select('*')
-        .eq('has_voted', true);
-      
-      console.log('Voters who have voted:', votersData);
-      console.log('Voters table error:', votersError);
-
-      const votes = votesData || [];
-      console.log('Processing votes:', votes);
-
-      // If we have no votes in the votes table but have voters who voted, 
-      // this indicates a data consistency issue
-      if (votes.length === 0 && votersData && votersData.length > 0) {
-        console.log('ISSUE FOUND: Voters have voted but no votes recorded in votes table');
-        console.log(`Found ${votersData.length} voters who have voted, but 0 votes in votes table`);
-        
-        toast({
-          title: "Data Inconsistency Detected",
-          description: `Found ${votersData.length} voters who have voted, but no vote records. This may indicate a database sync issue.`,
-          variant: "destructive",
-        });
-      }
-
-      if (votes.length === 0) {
-        console.log('No votes found in votes table');
-        setVoteData([]);
-        setLocationStats({
-          totalVotes: 0,
-          voterTurnout: votersData ? votersData.length : 0,
-          lastUpdated: new Date().toLocaleString()
-        });
+      if (error) {
+        console.error('Error loading votes:', error);
         return;
       }
 
       // Process vote data - group by position and candidate
       const votesByCandidate: { [key: string]: number } = {};
       
-      votes.forEach((vote: any) => {
-        console.log('Processing vote:', vote);
+      (votes || []).forEach((vote: any) => {
         const key = `${vote.position_id}-${vote.candidate_id}`;
         votesByCandidate[key] = (votesByCandidate[key] || 0) + 1;
       });
 
-      console.log('Votes grouped by candidate:', votesByCandidate);
-
       const processedData: VoteData[] = [];
       
-      // Define all possible positions and their candidates - updated to match VotingPage
+      // Define all positions and their candidates
       const positions = [
         { 
           id: 'President', 
           position_ids: ['1'], 
-          candidates: ['1', '2', '3'] // Updated to match VotingPage candidate IDs
+          candidates: ['1', '2', '3']
         },
         { 
           id: 'Governor', 
@@ -294,7 +343,6 @@ const ClerkDashboard = () => {
         position.candidates.forEach(candidateId => {
           let votes = 0;
           
-          // Check all possible position IDs for this candidate
           position.position_ids.forEach(positionId => {
             const key = `${positionId}-${candidateId}`;
             votes += votesByCandidate[key] || 0;
@@ -315,15 +363,13 @@ const ClerkDashboard = () => {
         });
       });
 
-      console.log('Final processed vote data:', processedData);
-      console.log('Total votes counted:', totalVotesCount);
-
       setVoteData(processedData);
 
       // Set location statistics
       setLocationStats({
         totalVotes: totalVotesCount,
-        voterTurnout: votersData ? votersData.length : totalVotesCount,
+        voterTurnout: voterStats?.totalVoted || 0,
+        registeredVoters: voterStats?.totalRegistered || 0,
         lastUpdated: new Date().toLocaleString()
       });
 
@@ -339,8 +385,9 @@ const ClerkDashboard = () => {
     }
   };
 
-  // Load vote data when component mounts and when location changes
+  // Load data when component mounts and when location changes
   useEffect(() => {
+    loadVoterData();
     loadVoteData();
   }, [location]);
 
@@ -401,9 +448,17 @@ const ClerkDashboard = () => {
     return <div>Loading...</div>;
   }
 
+  const electionPositions = [
+    { id: 'President', icon: '🏛️', description: 'Presidential Election' },
+    { id: 'Governor', icon: '🏢', description: 'County Governor' },
+    { id: 'Women Representative', icon: '👩‍💼', description: 'Women Representative' },
+    { id: 'Member of Parliament', icon: '🏛️', description: 'Parliamentary Seat' },
+    { id: 'Member of County Assembly', icon: '🏛️', description: 'County Assembly Seat' }
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-900 dark:to-gray-800 p-4">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
         <Card className="mb-6">
           <CardHeader>
@@ -414,16 +469,16 @@ const ClerkDashboard = () => {
                 </div>
                 <div>
                   <CardTitle className="text-2xl flex items-center gap-2">
-                    Clerk Dashboard
+                    Election Monitoring Dashboard
                     <div className="flex items-center gap-1">
                       <Radio className={`h-4 w-4 ${isRealTimeConnected ? 'text-green-500' : 'text-red-500'}`} />
-                      <span className={`text-sm ${isRealTimeConnected ? 'text-green-600' : 'text-red-600'}`}>
+                      <span className={`text-sm font-medium ${isRealTimeConnected ? 'text-green-600' : 'text-red-600'}`}>
                         {isRealTimeConnected ? 'LIVE' : 'OFFLINE'}
                       </span>
                     </div>
                   </CardTitle>
                   <CardDescription>
-                    Welcome, {clerkData.name} (Reg: {clerkData.registrationNumber}) - Monitoring vote updates
+                    Welcome, {clerkData.name} (Reg: {clerkData.registrationNumber}) - Real-time election monitoring
                   </CardDescription>
                 </div>
               </div>
@@ -448,13 +503,16 @@ const ClerkDashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center">
               <MapPin className="h-5 w-5 mr-2" />
-              Select Location to Filter Results (Optional)
+              Select Location to Monitor
             </CardTitle>
+            <CardDescription>
+              Choose a specific location to view voter turnout and vote counts for that area
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>County ({counties.length} counties)</Label>
+                <Label>County ({counties.length} available)</Label>
                 <Select value={location.county} onValueChange={(value) => handleLocationChange('county', value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="All counties" />
@@ -469,7 +527,7 @@ const ClerkDashboard = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Constituency ({getConstituencies(location.county).length} constituencies)</Label>
+                <Label>Constituency ({getConstituencies(location.county).length} available)</Label>
                 <Select 
                   value={location.constituency} 
                   onValueChange={(value) => handleLocationChange('constituency', value)}
@@ -488,7 +546,7 @@ const ClerkDashboard = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Ward ({getWards(location.county, location.constituency).length} wards)</Label>
+                <Label>Ward ({getWards(location.county, location.constituency).length} available)</Label>
                 <Select 
                   value={location.ward} 
                   onValueChange={(value) => handleLocationChange('ward', value)}
@@ -509,78 +567,125 @@ const ClerkDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Vote Statistics */}
-        {locationStats && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <BarChart3 className="h-5 w-5 mr-2" />
-                Vote Statistics for {getLocationDisplayName()}
-                <Badge variant={isRealTimeConnected ? "default" : "destructive"} className="ml-2">
-                  {isRealTimeConnected ? "LIVE UPDATES" : "OFFLINE"}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{locationStats.totalVotes}</div>
-                  <div className="text-sm text-blue-500 dark:text-blue-300">Total Votes Cast</div>
-                </div>
-                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">{locationStats.voterTurnout}</div>
-                  <div className="text-sm text-green-500 dark:text-green-300">Voter Participation</div>
-                </div>
-                <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-                  <div className="text-sm font-medium text-purple-600 dark:text-purple-400">{locationStats.lastUpdated}</div>
-                  <div className="text-sm text-purple-500 dark:text-purple-300">Last Updated</div>
+        {/* Voter Statistics */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <BarChart3 className="h-5 w-5 mr-2" />
+              Real-time Voter Statistics - {getLocationDisplayName()}
+              <Badge variant={isRealTimeConnected ? "default" : "destructive"} className="ml-2">
+                {isRealTimeConnected ? "LIVE UPDATES" : "OFFLINE"}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {voterStats?.totalRegistered || 0}
+                    </div>
+                    <div className="text-sm text-blue-500 dark:text-blue-300">Registered Voters</div>
+                  </div>
+                  <Users className="h-8 w-8 text-blue-400" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
+              
+              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {voterStats?.totalVoted || 0}
+                    </div>
+                    <div className="text-sm text-green-500 dark:text-green-300">Voters Participated</div>
+                  </div>
+                  <Vote className="h-8 w-8 text-green-400" />
+                </div>
+              </div>
+              
+              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                      {voterStats ? `${voterStats.turnoutPercentage.toFixed(1)}%` : '0%'}
+                    </div>
+                    <div className="text-sm text-purple-500 dark:text-purple-300">Voter Turnout</div>
+                  </div>
+                  <BarChart3 className="h-8 w-8 text-purple-400" />
+                </div>
+              </div>
+              
+              <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                      {locationStats?.lastUpdated || new Date().toLocaleString()}
+                    </div>
+                    <div className="text-sm text-orange-500 dark:text-orange-300">Last Updated</div>
+                  </div>
+                  <Radio className={`h-8 w-8 ${isRealTimeConnected ? 'text-green-500' : 'text-orange-400'}`} />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Vote Results */}
+        {/* Election Results by Position */}
         <div className="space-y-6">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Election Results by Position - {getLocationDisplayName()}
+            </h2>
+            <p className="text-gray-600 dark:text-gray-300 mt-2">
+              Real-time vote counts for all electoral positions
+            </p>
+          </div>
+
           {loading ? (
             <Card>
               <CardContent className="text-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p>Loading vote data from database...</p>
+                <p>Loading live election data...</p>
               </CardContent>
             </Card>
           ) : (
-            ['President', 'Governor', 'Women Representative', 'Member of Parliament', 'Member of County Assembly'].map((position) => {
-              const positionVotes = getVotesByPosition(position);
-              const totalVotes = getTotalVotesForPosition(position);
-              const leadingCandidate = getLeadingCandidate(position);
+            electionPositions.map((position) => {
+              const positionVotes = getVotesByPosition(position.id);
+              const totalVotes = getTotalVotesForPosition(position.id);
+              const leadingCandidate = getLeadingCandidate(position.id);
 
               return (
-                <Card key={position}>
+                <Card key={position.id} className="border-l-4 border-l-blue-500">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle className="text-xl flex items-center gap-2">
-                          {position}
+                        <CardTitle className="text-xl flex items-center gap-3">
+                          <span className="text-2xl">{position.icon}</span>
+                          {position.id}
                           {isRealTimeConnected && (
                             <Badge variant="outline" className="text-xs">
-                              <Radio className="h-3 w-3 mr-1 text-green-500" />
+                              <Radio className="h-3 w-3 mr-1 text-green-500 animate-pulse" />
                               Live
                             </Badge>
                           )}
                         </CardTitle>
-                        <CardDescription>
-                          {getLocationDisplayName()} - Results
+                        <CardDescription className="mt-1">
+                          {position.description} - {getLocationDisplayName()}
                         </CardDescription>
                       </div>
                       <div className="text-right">
-                        <div className="flex items-center space-x-2">
-                          <Users className="h-4 w-4 text-gray-500" />
-                          <span className="text-sm text-gray-600">Total Votes: {totalVotes}</span>
+                        <div className="flex items-center space-x-3">
+                          <div className="bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-lg">
+                            <div className="flex items-center space-x-2">
+                              <Users className="h-4 w-4 text-gray-500" />
+                              <span className="text-sm font-medium">Total Votes: {totalVotes}</span>
+                            </div>
+                          </div>
                         </div>
                         {leadingCandidate && totalVotes > 0 && (
-                          <Badge variant="secondary" className="mt-1">
-                            Leading: {leadingCandidate.candidate_name}
+                          <Badge variant="secondary" className="mt-2">
+                            🏆 Leading: {leadingCandidate.candidate_name}
                           </Badge>
                         )}
                       </div>
@@ -591,44 +696,69 @@ const ClerkDashboard = () => {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Candidate</TableHead>
+                            <TableHead className="w-[300px]">Candidate</TableHead>
                             <TableHead>Party</TableHead>
                             <TableHead className="text-right">Votes</TableHead>
                             <TableHead className="text-right">Percentage</TableHead>
+                            <TableHead className="text-center">Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {positionVotes.map((vote) => {
-                            const percentage = totalVotes > 0 ? (vote.votes / totalVotes * 100).toFixed(1) : '0.0';
-                            const isLeading = leadingCandidate?.candidate_id === vote.candidate_id && totalVotes > 0;
+                          {positionVotes
+                            .sort((a, b) => b.votes - a.votes)
+                            .map((vote, index) => {
+                              const percentage = totalVotes > 0 ? (vote.votes / totalVotes * 100).toFixed(1) : '0.0';
+                              const isLeading = index === 0 && totalVotes > 0;
 
-                            return (
-                              <TableRow key={vote.candidate_id}>
-                                <TableCell className={`font-medium ${isLeading ? 'text-green-700' : ''}`}>
-                                  {vote.candidate_name}
-                                  {isLeading && <span className="ml-2">👑</span>}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline">{vote.party}</Badge>
-                                </TableCell>
-                                <TableCell className={`text-right font-bold ${isLeading ? 'text-green-600' : ''}`}>
-                                  {vote.votes}
-                                  {isRealTimeConnected && vote.votes > 0 && (
-                                    <span className="text-xs text-green-500 ml-1">●</span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right text-sm text-gray-500">
-                                  {percentage}%
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
+                              return (
+                                <TableRow key={vote.candidate_id} className={isLeading ? 'bg-green-50 dark:bg-green-900/20' : ''}>
+                                  <TableCell className={`font-medium ${isLeading ? 'text-green-700 dark:text-green-300' : ''}`}>
+                                    <div className="flex items-center gap-2">
+                                      {isLeading && <span className="text-lg">👑</span>}
+                                      {vote.candidate_name}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline">{vote.party}</Badge>
+                                  </TableCell>
+                                  <TableCell className={`text-right font-bold text-lg ${isLeading ? 'text-green-600 dark:text-green-400' : ''}`}>
+                                    {vote.votes}
+                                    {isRealTimeConnected && vote.votes > 0 && (
+                                      <span className="text-xs text-green-500 ml-2 animate-pulse">●</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right text-sm">
+                                    <div className={`font-medium ${isLeading ? 'text-green-600' : 'text-gray-600'}`}>
+                                      {percentage}%
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    {isLeading ? (
+                                      <Badge className="bg-green-600">Leading</Badge>
+                                    ) : vote.votes > 0 ? (
+                                      <Badge variant="secondary">Active</Badge>
+                                    ) : (
+                                      <Badge variant="outline">No votes</Badge>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
                         </TableBody>
                       </Table>
                     ) : (
-                      <div className="text-center py-8 text-gray-500">
-                        <Radio className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                        No votes recorded yet for this position. Monitoring for updates.
+                      <div className="text-center py-12 text-gray-500">
+                        <Vote className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                        <h3 className="text-lg font-medium mb-2">No votes recorded yet</h3>
+                        <p className="text-sm">Monitoring for votes in this position for {getLocationDisplayName()}</p>
+                        {isRealTimeConnected && (
+                          <div className="mt-4">
+                            <Badge variant="outline">
+                              <Radio className="h-3 w-3 mr-1 text-green-500 animate-pulse" />
+                              Waiting for votes...
+                            </Badge>
+                          </div>
+                        )}
                       </div>
                     )}
                   </CardContent>
