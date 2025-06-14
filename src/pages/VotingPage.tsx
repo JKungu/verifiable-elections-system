@@ -1,111 +1,134 @@
 
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { Vote, Lock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { CheckCircle, Vote, ArrowLeft, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Candidate {
+  id: string;
+  name: string;
+  party: string;
+  image?: string;
+}
+
+interface Position {
+  id: string;
+  title: string;
+  candidates: Candidate[];
+}
+
+interface VoteSelection {
+  [positionId: string]: string; // position -> candidate id
+}
 
 const VotingPage = () => {
-  const { electionId } = useParams<{ electionId: string }>();
-  const { citizen } = useAuth();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  
-  const [selectedCandidate, setSelectedCandidate] = useState<string>('');
+  const [positions] = useState<Position[]>([
+    {
+      id: 'President',
+      title: 'President of Kenya',
+      candidates: [
+        { id: 'p1', name: 'John Kamau', party: 'Democratic Alliance' },
+        { id: 'p2', name: 'Mary Wanjiku', party: 'Unity Party' },
+        { id: 'p3', name: 'David Otieno', party: 'Progressive Movement' }
+      ]
+    },
+    {
+      id: 'Governor',
+      title: 'Governor',
+      candidates: [
+        { id: 'g1', name: 'Peter Mwangi', party: 'County First' },
+        { id: 'g2', name: 'Grace Akinyi', party: 'Development Party' }
+      ]
+    },
+    {
+      id: 'Women Representative',
+      title: 'Women Representative',
+      candidates: [
+        { id: 'w1', name: 'Susan Njeri', party: 'Women First' },
+        { id: 'w2', name: 'Margaret Wambui', party: 'Equality Party' }
+      ]
+    },
+    {
+      id: 'Member of Parliament',
+      title: 'Member of Parliament',
+      candidates: [
+        { id: 'm1', name: 'Robert Macharia', party: 'Grassroots Party' },
+        { id: 'm2', name: 'Lucy Wambui', party: 'Youth Movement' }
+      ]
+    },
+    {
+      id: 'Member of County Assembly',
+      title: 'Member of County Assembly',
+      candidates: [
+        { id: 'c1', name: 'Francis Mutua', party: 'Local Development' },
+        { id: 'c2', name: 'Catherine Wairimu', party: 'Community First' }
+      ]
+    }
+  ]);
+
+  const [selections, setSelections] = useState<VoteSelection>({});
+  const [currentPositionIndex, setCurrentPositionIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [voterData, setVoterData] = useState<any>(null);
+  
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { toast } = useToast();
 
-  const { data: election, isLoading: electionLoading } = useQuery({
-    queryKey: ['election', electionId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('elections')
-        .select('*, candidates(*)')
-        .eq('id', electionId!)
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!electionId,
-  });
-
-  const { data: existingVote } = useQuery({
-    queryKey: ['existingVote', electionId, citizen?.id],
-    queryFn: async () => {
-      if (!citizen?.id || !electionId) return null;
-      
-      const { data, error } = await supabase
-        .from('voter_ballots')
-        .select('*')
-        .eq('citizen_id', citizen.id)
-        .eq('election_id', electionId)
-        .maybeSingle();
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!citizen?.id && !!electionId,
-  });
-
-  const castVoteMutation = useMutation({
-    mutationFn: async ({ candidateId }: { candidateId: string }) => {
-      if (!citizen?.id || !electionId) throw new Error('Missing required data');
-
-      // Generate a simple encrypted vote (in real implementation, use proper encryption)
-      const encryptedVote = btoa(JSON.stringify({ 
-        candidateId, 
-        timestamp: Date.now(),
-        electionId 
-      }));
-      
-      // Generate vote hash for verification
-      const voteHash = btoa(`${citizen.id}-${electionId}-${Date.now()}`);
-
-      const { data, error } = await supabase.rpc('cast_or_update_vote', {
-        p_citizen_id: citizen.id,
-        p_election_id: electionId,
-        p_encrypted_vote: encryptedVote,
-        p_vote_hash: voteHash,
-        p_ip_address: null, // Would be captured from request in real implementation
-        p_user_agent: navigator.userAgent,
-        p_device_fingerprint: 'browser-fingerprint', // Would use actual fingerprinting
-      });
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['existingVote'] });
-      queryClient.invalidateQueries({ queryKey: ['votingHistory'] });
+  useEffect(() => {
+    // Get voter data from navigation state
+    const voter = location.state?.voter;
+    if (!voter) {
       toast({
-        title: "Vote Cast Successfully!",
-        description: "Your vote has been securely recorded and encrypted.",
-      });
-      navigate('/dashboard');
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to cast vote. Please try again.",
+        title: "Access Denied",
+        description: "Please login first to access voting.",
         variant: "destructive",
       });
-    },
-  });
+      navigate('/voter-login');
+      return;
+    }
+    setVoterData(voter);
+  }, [location.state, navigate, toast]);
+
+  const handleCandidateSelect = (positionId: string, candidateId: string) => {
+    setSelections(prev => ({
+      ...prev,
+      [positionId]: candidateId
+    }));
+  };
+
+  const handleNext = () => {
+    if (currentPositionIndex < positions.length - 1) {
+      setCurrentPositionIndex(prev => prev + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentPositionIndex > 0) {
+      setCurrentPositionIndex(prev => prev - 1);
+    }
+  };
 
   const handleSubmitVote = async () => {
-    if (!selectedCandidate) {
+    if (!voterData) {
       toast({
-        title: "Please select a candidate",
-        description: "You must choose a candidate before submitting your vote.",
+        title: "Error",
+        description: "Voter data not found. Please login again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if all positions have selections
+    const unselectedPositions = positions.filter(pos => !selections[pos.id]);
+    if (unselectedPositions.length > 0) {
+      toast({
+        title: "Incomplete Ballot",
+        description: `Please select candidates for: ${unselectedPositions.map(p => p.title).join(', ')}`,
         variant: "destructive",
       });
       return;
@@ -113,148 +136,192 @@ const VotingPage = () => {
 
     setIsSubmitting(true);
     try {
-      await castVoteMutation.mutateAsync({ candidateId: selectedCandidate });
+      console.log('Submitting votes for voter:', voterData.id);
+      console.log('Vote selections:', selections);
+
+      // Insert votes into the votes table
+      const votePromises = Object.entries(selections).map(async ([positionId, candidateId]) => {
+        const { error } = await supabase
+          .from('votes')
+          .insert({
+            position_id: positionId,
+            candidate_id: candidateId,
+            voter_id: voterData.id
+          });
+
+        if (error) {
+          console.error(`Error inserting vote for ${positionId}:`, error);
+          throw error;
+        }
+      });
+
+      await Promise.all(votePromises);
+
+      // Update voter status
+      const { error: voterUpdateError } = await supabase
+        .from('voters')
+        .update({ 
+          has_voted: true,
+          voted_at: new Date().toISOString()
+        })
+        .eq('id', voterData.id);
+
+      if (voterUpdateError) {
+        console.error('Error updating voter status:', voterUpdateError);
+        throw voterUpdateError;
+      }
+
+      console.log('All votes submitted successfully');
+
+      toast({
+        title: "Vote Submitted Successfully",
+        description: "Thank you for participating in the election!",
+      });
+
+      // Navigate to success page
+      navigate('/vote-success', { 
+        state: { 
+          voter: voterData,
+          selections: selections 
+        }
+      });
+
+    } catch (error) {
+      console.error('Error submitting votes:', error);
+      toast({
+        title: "Submission Failed",
+        description: "There was an error submitting your vote. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (electionLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
+  if (!voterData) {
+    return <div>Loading...</div>;
   }
 
-  if (!election) {
-    return (
-      <div className="text-center py-12">
-        <h1 className="text-2xl font-bold text-gray-900">Election Not Found</h1>
-        <p className="text-gray-600 mt-2">The election you're looking for doesn't exist.</p>
-      </div>
-    );
-  }
-
-  const now = new Date();
-  const votingStart = new Date(election.voting_start);
-  const votingEnd = new Date(election.voting_end);
-  const isVotingPeriod = now >= votingStart && now <= votingEnd;
-  const hasVoted = !!existingVote;
-
-  if (!isVotingPeriod) {
-    return (
-      <div className="max-w-2xl mx-auto">
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            Voting is not currently open for this election.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  if (citizen?.verification_status !== 'verified') {
-    return (
-      <div className="max-w-2xl mx-auto">
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            You must complete identity verification before you can vote.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
+  const currentPosition = positions[currentPositionIndex];
+  const selectedCandidate = selections[currentPosition.id];
+  const isLastPosition = currentPositionIndex === positions.length - 1;
+  const allPositionsSelected = positions.every(pos => selections[pos.id]);
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Election Header */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-2xl">{election.title}</CardTitle>
-              <CardDescription className="mt-2">
-                {election.description}
-              </CardDescription>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="bg-blue-600 p-3 rounded-full">
+                  <Vote className="h-8 w-8 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-2xl">Electronic Voting System</CardTitle>
+                  <CardDescription>
+                    Voter: {voterData.first_name} {voterData.last_name} ({voterData.id_number})
+                  </CardDescription>
+                </div>
+              </div>
+              <Badge variant="secondary">
+                Position {currentPositionIndex + 1} of {positions.length}
+              </Badge>
             </div>
-            <div className="flex items-center space-x-2">
-              <Badge variant="default">Live</Badge>
-              {hasVoted && (
-                <Badge variant="secondary" className="bg-green-100 text-green-800">
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  Voted
-                </Badge>
-              )}
+          </CardHeader>
+        </Card>
+
+        {/* Progress Bar */}
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium">Progress</span>
+              <span className="text-sm text-gray-500">
+                {Object.keys(selections).length} of {positions.length} completed
+              </span>
             </div>
-          </div>
-        </CardHeader>
-      </Card>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${(Object.keys(selections).length / positions.length) * 100}%` }}
+              ></div>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Voting Instructions */}
-      <Alert>
-        <Lock className="h-4 w-4" />
-        <AlertDescription>
-          Your vote will be encrypted and anonymized. {hasVoted ? 'You can change your vote until the election ends - only your last vote will count.' : 'You can change your vote anytime before the election ends.'}
-        </AlertDescription>
-      </Alert>
-
-      {/* Candidates */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Select Your Candidate</CardTitle>
-          <CardDescription>
-            Choose one candidate to cast your vote for
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <RadioGroup value={selectedCandidate} onValueChange={setSelectedCandidate}>
-            <div className="space-y-4">
-              {election.candidates?.map((candidate) => (
-                <div key={candidate.id} className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-gray-50">
-                  <RadioGroupItem value={candidate.id} id={candidate.id} className="mt-1" />
-                  <Label htmlFor={candidate.id} className="flex-1 cursor-pointer">
-                    <div>
-                      <h3 className="font-semibold text-lg">{candidate.name}</h3>
-                      {candidate.party && (
-                        <p className="text-sm text-gray-600 mb-2">{candidate.party}</p>
-                      )}
-                      {candidate.description && (
-                        <p className="text-sm text-gray-700">{candidate.description}</p>
-                      )}
+        {/* Current Position */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-xl">{currentPosition.title}</CardTitle>
+            <CardDescription>Select one candidate for this position</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4">
+              {currentPosition.candidates.map((candidate) => (
+                <div
+                  key={candidate.id}
+                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                    selectedCandidate === candidate.id
+                      ? 'border-blue-500 bg-blue-50 shadow-md'
+                      : 'border-gray-200 hover:border-blue-300 hover:bg-blue-25'
+                  }`}
+                  onClick={() => handleCandidateSelect(currentPosition.id, candidate.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="bg-gray-200 p-3 rounded-full">
+                        <User className="h-6 w-6 text-gray-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-lg">{candidate.name}</h3>
+                        <p className="text-gray-600">{candidate.party}</p>
+                      </div>
                     </div>
-                  </Label>
+                    {selectedCandidate === candidate.id && (
+                      <CheckCircle className="h-6 w-6 text-blue-500" />
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
-          </RadioGroup>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Submit Vote */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold">Ready to submit your vote?</h3>
-              <p className="text-sm text-gray-600">
-                {hasVoted ? 'This will replace your previous vote.' : 'Your vote will be encrypted and recorded securely.'}
-              </p>
+        {/* Navigation */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex justify-between">
+              <Button
+                variant="outline"
+                onClick={handlePrevious}
+                disabled={currentPositionIndex === 0}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Previous
+              </Button>
+
+              {isLastPosition ? (
+                <Button
+                  onClick={handleSubmitVote}
+                  disabled={!allPositionsSelected || isSubmitting}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Vote'}
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleNext}
+                  disabled={!selectedCandidate}
+                >
+                  Next
+                  <Vote className="h-4 w-4 ml-2" />
+                </Button>
+              )}
             </div>
-            <Button
-              onClick={handleSubmitVote}
-              disabled={!selectedCandidate || isSubmitting}
-              size="lg"
-              className="px-8"
-            >
-              <Vote className="h-4 w-4 mr-2" />
-              {isSubmitting ? 'Submitting...' : hasVoted ? 'Update Vote' : 'Cast Vote'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
