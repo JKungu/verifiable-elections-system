@@ -5,18 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, BarChart3, Users, LogOut, Shield, Download, Radio, Vote } from 'lucide-react';
+import { MapPin, LogOut, Shield, Download, Radio } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { COUNTIES } from '@/data/kenyaLocations';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import VoteDistributionChart from '@/components/VoteDistributionChart';
+import VoteStatsOverview from '@/components/VoteStatsOverview';
 
 interface ClerkData {
   registrationNumber: string;
@@ -34,13 +28,6 @@ interface VoteData {
   location: string;
 }
 
-interface LocationVoteStats {
-  totalVotes: number;
-  voterTurnout: number;
-  registeredVoters: number;
-  lastUpdated: string;
-}
-
 interface LocationVoterData {
   totalRegistered: number;
   totalVoted: number;
@@ -55,7 +42,6 @@ const ClerkDashboard = () => {
   });
   const [clerkData, setClerkData] = useState<ClerkData | null>(null);
   const [voteData, setVoteData] = useState<VoteData[]>([]);
-  const [locationStats, setLocationStats] = useState<LocationVoteStats | null>(null);
   const [voterStats, setVoterStats] = useState<LocationVoterData | null>(null);
   const [loading, setLoading] = useState(false);
   const [isRealTimeConnected, setIsRealTimeConnected] = useState(false);
@@ -138,7 +124,7 @@ const ClerkDashboard = () => {
             });
           }
           loadVoterData();
-          loadVoteData(); // Reload vote data when voter data changes
+          loadVoteData();
         }
       )
       .subscribe();
@@ -184,7 +170,6 @@ const ClerkDashboard = () => {
   const getLocationFilter = () => {
     if (location.county === 'all') return null;
     
-    // Find the ward ID for the selected location
     if (location.ward !== 'all') {
       const county = COUNTIES.find(c => c.name === location.county);
       if (county) {
@@ -196,7 +181,6 @@ const ClerkDashboard = () => {
       }
     }
     
-    // If no specific ward, but constituency is selected, get all wards in that constituency
     if (location.constituency !== 'all') {
       const county = COUNTIES.find(c => c.name === location.county);
       if (county) {
@@ -207,7 +191,6 @@ const ClerkDashboard = () => {
       }
     }
     
-    // If only county is selected, get all wards in that county
     const county = COUNTIES.find(c => c.name === location.county);
     if (county) {
       return county.subcounties.flatMap(sc => sc.wards.map(w => w.id));
@@ -218,24 +201,15 @@ const ClerkDashboard = () => {
 
   const getCandidateDisplayName = (candidateId: string, positionId: string) => {
     const candidateInfo: { [key: string]: { name: string; party: string } } = {
-      // Presidential candidates (position 1)
       '1': { name: 'John Kamau', party: 'Democratic Alliance' },
       '2': { name: 'Mary Wanjiku', party: 'Unity Party' },
       '3': { name: 'David Otieno', party: 'Progressive Movement' },
-      
-      // Governor candidates (position 2)
       'g1': { name: 'Peter Mwangi', party: 'County First' },
       'g2': { name: 'Grace Akinyi', party: 'Development Party' },
-      
-      // Women Representative candidates (position 3)
       'w1': { name: 'Susan Njeri', party: 'Women First' },
       'w2': { name: 'Margaret Wambui', party: 'Equality Party' },
-      
-      // MP candidates (position 4)
       'm1': { name: 'Robert Macharia', party: 'Grassroots Party' },
       'm2': { name: 'Lucy Wambui', party: 'Youth Movement' },
-      
-      // MCA candidates (position 5)
       'c1': { name: 'Francis Mutua', party: 'Local Development' },
       'c2': { name: 'Catherine Wairimu', party: 'Community First' }
     };
@@ -292,7 +266,6 @@ const ClerkDashboard = () => {
       console.log('=== LOADING VOTE DATA ===');
       console.log('Loading vote data for location:', getLocationDisplayName());
 
-      // Get actual votes from database
       const { data: votes, error } = await supabase
         .from('votes')
         .select('*');
@@ -305,7 +278,6 @@ const ClerkDashboard = () => {
       console.log('Raw votes from database:', votes);
       console.log('Number of votes in database:', votes?.length || 0);
 
-      // Process vote data - group by position and candidate, counting only actual votes
       const votesByCandidate: { [key: string]: number } = {};
       
       (votes || []).forEach((vote: any) => {
@@ -318,7 +290,6 @@ const ClerkDashboard = () => {
 
       const processedData: VoteData[] = [];
       
-      // Define all positions and their candidates
       const positions = [
         { 
           id: 'President', 
@@ -347,13 +318,11 @@ const ClerkDashboard = () => {
         }
       ];
 
-      // For each position, show actual votes
       positions.forEach(position => {
         console.log(`Processing position: ${position.id}`);
         position.candidates.forEach(candidateId => {
           let actualVotes = 0;
           
-          // Count actual votes for this candidate across all position IDs
           position.position_ids.forEach(positionId => {
             const key = `${positionId}-${candidateId}`;
             const voteCount = votesByCandidate[key] || 0;
@@ -378,27 +347,6 @@ const ClerkDashboard = () => {
 
       console.log('Final processed vote data:', processedData);
       setVoteData(processedData);
-
-      // Calculate total actual votes
-      const totalActualVotes = processedData.reduce((total, vote) => total + vote.votes, 0);
-      console.log('Total actual votes across all positions:', totalActualVotes);
-
-      // Get voter turnout (people who have voted)
-      const { data: votedVoters } = await supabase
-        .from('voters')
-        .select('*')
-        .eq('has_voted', true);
-
-      const voterTurnout = votedVoters?.length || 0;
-      console.log('Voter turnout (people who voted):', voterTurnout);
-
-      // Set location statistics based on actual data
-      setLocationStats({
-        totalVotes: totalActualVotes,
-        voterTurnout: voterTurnout,
-        registeredVoters: 25000,
-        lastUpdated: new Date().toLocaleString()
-      });
 
       console.log('=== VOTE DATA LOADING COMPLETED ===');
 
@@ -436,7 +384,7 @@ const ClerkDashboard = () => {
       Party: vote.party,
       Votes: vote.votes,
       Location: vote.location,
-      LastUpdated: locationStats?.lastUpdated || new Date().toLocaleString()
+      LastUpdated: new Date().toLocaleString()
     }));
 
     const csvString = [
@@ -456,21 +404,6 @@ const ClerkDashboard = () => {
       title: "Export Complete",
       description: "Vote data has been exported successfully.",
     });
-  };
-
-  const getVotesByPosition = (position: string) => {
-    return voteData.filter(vote => vote.position === position);
-  };
-
-  const getTotalVotesForPosition = (position: string) => {
-    return getVotesByPosition(position).reduce((total, vote) => total + vote.votes, 0);
-  };
-
-  const getLeadingCandidate = (position: string) => {
-    const positionVotes = getVotesByPosition(position);
-    return positionVotes.reduce((leader, current) => 
-      current.votes > (leader?.votes || 0) ? current : leader
-    , null);
   };
 
   const getTotalVotesAcrossAllPositions = () => {
@@ -502,7 +435,7 @@ const ClerkDashboard = () => {
                 </div>
                 <div>
                   <CardTitle className="text-2xl flex items-center gap-2">
-                    Election Monitoring Dashboard
+                    Election Vote Distribution Dashboard
                     <div className="flex items-center gap-1">
                       <Radio className={`h-4 w-4 ${isRealTimeConnected ? 'text-green-500' : 'text-red-500'}`} />
                       <span className={`text-sm font-medium ${isRealTimeConnected ? 'text-green-600' : 'text-red-600'}`}>
@@ -511,7 +444,7 @@ const ClerkDashboard = () => {
                     </div>
                   </CardTitle>
                   <CardDescription>
-                    Welcome, {clerkData.name} (Reg: {clerkData.registrationNumber}) - Real-time election monitoring
+                    Welcome, {clerkData.name} (Reg: {clerkData.registrationNumber}) - Real-time vote monitoring and distribution
                   </CardDescription>
                 </div>
               </div>
@@ -536,10 +469,10 @@ const ClerkDashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center">
               <MapPin className="h-5 w-5 mr-2" />
-              Select Location to Monitor
+              Select Location to Monitor Vote Distribution
             </CardTitle>
             <CardDescription>
-              Choose a specific location to view voter turnout and vote counts for that area
+              Choose a specific location to view detailed vote distribution and candidate performance
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -600,127 +533,26 @@ const ClerkDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Enhanced Statistics Dashboard */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <BarChart3 className="h-5 w-5 mr-2" />
-              Real-time Election Statistics - {getLocationDisplayName()}
-              <Badge variant={isRealTimeConnected ? "default" : "destructive"} className="ml-2">
-                {isRealTimeConnected ? "LIVE UPDATES" : "OFFLINE"}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                      {voterStats?.totalRegistered || 0}
-                    </div>
-                    <div className="text-sm text-blue-500 dark:text-blue-300">Registered Voters</div>
-                  </div>
-                  <Users className="h-8 w-8 text-blue-400" />
-                </div>
-              </div>
-              
-              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                      {voterStats?.totalVoted || 0}
-                    </div>
-                    <div className="text-sm text-green-500 dark:text-green-300">Voters Participated</div>
-                  </div>
-                  <Vote className="h-8 w-8 text-green-400" />
-                </div>
-              </div>
-              
-              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                      {voterStats ? `${voterStats.turnoutPercentage.toFixed(1)}%` : '0%'}
-                    </div>
-                    <div className="text-sm text-purple-500 dark:text-purple-300">Voter Turnout</div>
-                  </div>
-                  <BarChart3 className="h-8 w-8 text-purple-400" />
-                </div>
-              </div>
-              
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                      {getTotalVotesAcrossAllPositions()}
-                    </div>
-                    <div className="text-sm text-yellow-500 dark:text-yellow-300">Total Votes Cast</div>
-                  </div>
-                  <Vote className="h-8 w-8 text-yellow-400" />
-                </div>
-              </div>
-              
-              <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-orange-600 dark:text-orange-400">
-                      {locationStats?.lastUpdated || new Date().toLocaleString()}
-                    </div>
-                    <div className="text-sm text-orange-500 dark:text-orange-300">Last Updated</div>
-                  </div>
-                  <Radio className={`h-8 w-8 ${isRealTimeConnected ? 'text-green-500' : 'text-orange-400'}`} />
-                </div>
-              </div>
-            </div>
+        {/* Vote Statistics Overview */}
+        {voterStats && (
+          <VoteStatsOverview
+            totalRegistered={voterStats.totalRegistered}
+            totalVoted={voterStats.totalVoted}
+            totalVotes={getTotalVotesAcrossAllPositions()}
+            turnoutPercentage={voterStats.turnoutPercentage}
+            locationName={getLocationDisplayName()}
+            isRealTimeConnected={isRealTimeConnected}
+          />
+        )}
 
-            {/* Quick Vote Summary */}
-            {voteData.length > 0 && (
-              <div className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 p-4 rounded-lg">
-                <h3 className="text-lg font-semibold mb-3">Quick Vote Summary - {getLocationDisplayName()}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                  {electionPositions.map((position) => {
-                    const leadingCandidate = getLeadingCandidate(position.id);
-                    const totalVotes = getTotalVotesForPosition(position.id);
-                    
-                    return (
-                      <div key={position.id} className="bg-white dark:bg-gray-800 p-3 rounded-lg border">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-lg">{position.icon}</span>
-                          <span className="font-medium text-sm">{position.id}</span>
-                        </div>
-                        {leadingCandidate ? (
-                          <div>
-                            <div className="text-lg font-bold text-green-600">
-                              {leadingCandidate.votes} votes
-                            </div>
-                            <div className="text-xs text-gray-600 dark:text-gray-400">
-                              Leading: {leadingCandidate.candidate_name}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Total: {totalVotes} votes
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-500">No votes yet</div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Election Results by Position */}
+        {/* Vote Distribution Charts */}
         <div className="space-y-6">
           <div className="text-center mb-6">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Detailed Election Results by Position - {getLocationDisplayName()}
+              Live Vote Distribution by Position - {getLocationDisplayName()}
             </h2>
             <p className="text-gray-600 dark:text-gray-300 mt-2">
-              Real-time vote counts for all electoral positions
+              Real-time vote counts and distribution percentages for all electoral positions
             </p>
           </div>
 
@@ -728,125 +560,18 @@ const ClerkDashboard = () => {
             <Card>
               <CardContent className="text-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p>Loading live election data...</p>
+                <p>Loading live vote distribution data...</p>
               </CardContent>
             </Card>
           ) : (
-            electionPositions.map((position) => {
-              const positionVotes = getVotesByPosition(position.id);
-              const totalVotes = getTotalVotesForPosition(position.id);
-              const leadingCandidate = getLeadingCandidate(position.id);
-
-              return (
-                <Card key={position.id} className="border-l-4 border-l-blue-500">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-xl flex items-center gap-3">
-                          <span className="text-2xl">{position.icon}</span>
-                          {position.id}
-                          {isRealTimeConnected && (
-                            <Badge variant="outline" className="text-xs">
-                              <Radio className="h-3 w-3 mr-1 text-green-500 animate-pulse" />
-                              Live
-                            </Badge>
-                          )}
-                        </CardTitle>
-                        <CardDescription className="mt-1">
-                          {position.description} - {getLocationDisplayName()}
-                        </CardDescription>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center space-x-3">
-                          <div className="bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-lg">
-                            <div className="flex items-center space-x-2">
-                              <Users className="h-4 w-4 text-gray-500" />
-                              <span className="text-sm font-medium">Total Votes: {totalVotes}</span>
-                            </div>
-                          </div>
-                        </div>
-                        {leadingCandidate && totalVotes > 0 && (
-                          <Badge variant="secondary" className="mt-2">
-                            🏆 Leading: {leadingCandidate.candidate_name}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {positionVotes.length > 0 ? (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[300px]">Candidate</TableHead>
-                            <TableHead>Party</TableHead>
-                            <TableHead className="text-right">Votes</TableHead>
-                            <TableHead className="text-right">Percentage</TableHead>
-                            <TableHead className="text-center">Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {positionVotes
-                            .sort((a, b) => b.votes - a.votes)
-                            .map((vote, index) => {
-                              const percentage = totalVotes > 0 ? (vote.votes / totalVotes * 100).toFixed(1) : '0.0';
-                              const isLeading = index === 0 && totalVotes > 0;
-
-                              return (
-                                <TableRow key={vote.candidate_id} className={isLeading ? 'bg-green-50 dark:bg-green-900/20' : ''}>
-                                  <TableCell className={`font-medium ${isLeading ? 'text-green-700 dark:text-green-300' : ''}`}>
-                                    <div className="flex items-center gap-2">
-                                      {isLeading && <span className="text-lg">👑</span>}
-                                      {vote.candidate_name}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline">{vote.party}</Badge>
-                                  </TableCell>
-                                  <TableCell className={`text-right font-bold text-lg ${isLeading ? 'text-green-600 dark:text-green-400' : ''}`}>
-                                    {vote.votes}
-                                    {isRealTimeConnected && vote.votes > 0 && (
-                                      <span className="text-xs text-green-500 ml-2 animate-pulse">●</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="text-right text-sm">
-                                    <div className={`font-medium ${isLeading ? 'text-green-600' : 'text-gray-600'}`}>
-                                      {percentage}%
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    {isLeading ? (
-                                      <Badge className="bg-green-600">Leading</Badge>
-                                    ) : vote.votes > 0 ? (
-                                      <Badge variant="secondary">Active</Badge>
-                                    ) : (
-                                      <Badge variant="outline">No votes</Badge>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                        </TableBody>
-                      </Table>
-                    ) : (
-                      <div className="text-center py-12 text-gray-500">
-                        <Vote className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                        <h3 className="text-lg font-medium mb-2">No votes recorded yet</h3>
-                        <p className="text-sm">Monitoring for votes in this position for {getLocationDisplayName()}</p>
-                        {isRealTimeConnected && (
-                          <div className="mt-4">
-                            <Badge variant="outline">
-                              <Radio className="h-3 w-3 mr-1 text-green-500 animate-pulse" />
-                              Waiting for votes...
-                            </Badge>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })
+            electionPositions.map((position) => (
+              <VoteDistributionChart
+                key={position.id}
+                voteData={voteData}
+                position={position.id}
+                positionIcon={position.icon}
+              />
+            ))
           )}
         </div>
       </div>
