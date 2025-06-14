@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -269,7 +268,7 @@ const ClerkDashboard = () => {
         return;
       }
 
-      const totalRegistered = allVoters?.length || 0;
+      const totalRegistered = 25000;
       const totalVoted = votedVoters?.length || 0;
       const turnoutPercentage = totalRegistered > 0 ? (totalVoted / totalRegistered * 100) : 0;
 
