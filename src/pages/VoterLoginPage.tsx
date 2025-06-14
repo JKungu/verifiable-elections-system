@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, ArrowRight } from 'lucide-react';
+import { User, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
@@ -83,6 +83,17 @@ const VoterLoginPage = () => {
         <ThemeToggle />
       </div>
       
+      <div className="absolute top-4 left-4">
+        <Button
+          variant="outline"
+          onClick={() => navigate('/')}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Home
+        </Button>
+      </div>
+      
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -158,16 +169,6 @@ const VoterLoginPage = () => {
               <ArrowRight className="h-4 w-4 mr-2" />
               {isLoading ? 'Logging in...' : 'Continue to Location Selection'}
             </Button>
-
-            <div className="text-center">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate('/')}
-              >
-                Back to Home
-              </Button>
-            </div>
           </form>
         </CardContent>
       </Card>
