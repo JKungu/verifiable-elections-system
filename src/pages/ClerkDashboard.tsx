@@ -291,28 +291,7 @@ const ClerkDashboard = () => {
     try {
       console.log('Loading vote data for location:', getLocationDisplayName());
 
-      // Get the number of voters who have actually voted
-      let voterQuery = supabase.from('voters').select('*').eq('has_voted', true);
-      
-      const locationFilter = getLocationFilter();
-      if (locationFilter) {
-        if (Array.isArray(locationFilter)) {
-          voterQuery = voterQuery.in('location_id', locationFilter);
-        } else {
-          voterQuery = voterQuery.eq('location_id', locationFilter);
-        }
-      }
-
-      const { data: votedVoters, error: voterError } = await voterQuery;
-      if (voterError) {
-        console.error('Error loading voter data:', voterError);
-        return;
-      }
-
-      const totalVotersWhoVoted = votedVoters?.length || 0;
-      console.log('Total voters who have voted:', totalVotersWhoVoted);
-
-      // Get actual votes from database
+      // Get actual votes from database only
       const { data: votes, error } = await supabase
         .from('votes')
         .select('*');
@@ -322,13 +301,17 @@ const ClerkDashboard = () => {
         return;
       }
 
-      // Process vote data - group by position and candidate
+      console.log('Raw votes from database:', votes);
+
+      // Process vote data - group by position and candidate, counting only actual votes
       const votesByCandidate: { [key: string]: number } = {};
       
       (votes || []).forEach((vote: any) => {
         const key = `${vote.position_id}-${vote.candidate_id}`;
         votesByCandidate[key] = (votesByCandidate[key] || 0) + 1;
       });
+
+      console.log('Processed votes by candidate:', votesByCandidate);
 
       const processedData: VoteData[] = [];
       
@@ -361,56 +344,26 @@ const ClerkDashboard = () => {
         }
       ];
 
-      // For each position, distribute votes among candidates
-      // If no actual votes exist but voters have participated, create simulated distribution
+      // For each position, show only actual votes - no simulation
       positions.forEach(position => {
-        let totalVotesForPosition = 0;
-        const candidateVotes: { [key: string]: number } = {};
-        
-        // First, count actual votes for this position
         position.candidates.forEach(candidateId => {
-          let votes = 0;
+          let actualVotes = 0;
+          
+          // Count actual votes for this candidate across all position IDs
           position.position_ids.forEach(positionId => {
             const key = `${positionId}-${candidateId}`;
-            votes += votesByCandidate[key] || 0;
+            actualVotes += votesByCandidate[key] || 0;
           });
-          candidateVotes[candidateId] = votes;
-          totalVotesForPosition += votes;
-        });
 
-        // If we have voters who voted but no votes recorded for this position,
-        // distribute the votes among candidates (simulating real voting behavior)
-        if (totalVotesForPosition === 0 && totalVotersWhoVoted > 0) {
-          // Distribute votes with some realistic variance
-          const candidateIds = position.candidates;
-          let remainingVotes = totalVotersWhoVoted;
-          
-          candidateIds.forEach((candidateId, index) => {
-            if (index === candidateIds.length - 1) {
-              // Last candidate gets remaining votes
-              candidateVotes[candidateId] = remainingVotes;
-            } else {
-              // Distribute votes with some randomness (but deterministic based on candidate ID)
-              const percentage = candidateId === '1' || candidateId === 'g1' || candidateId === 'w1' || candidateId === 'm1' || candidateId === 'c1' 
-                ? 0.6 // First candidate gets 60%
-                : 0.4; // Others split remaining
-              const votes = Math.floor(totalVotersWhoVoted * percentage / (candidateIds.length - index));
-              candidateVotes[candidateId] = Math.min(votes, remainingVotes);
-              remainingVotes -= candidateVotes[candidateId];
-            }
-          });
-        }
-        
-        // Add to processed data
-        position.candidates.forEach(candidateId => {
           const candidateInfo = getCandidateDisplayName(candidateId, position.id);
           
+          // Only add candidates who have received actual votes, or show 0 for all candidates
           processedData.push({
             position: position.id,
             candidate_id: candidateId,
             candidate_name: candidateInfo.name,
             party: candidateInfo.party,
-            votes: candidateVotes[candidateId] || 0,
+            votes: actualVotes, // Show only actual votes, no simulation
             location: getLocationDisplayName()
           });
         });
@@ -418,19 +371,28 @@ const ClerkDashboard = () => {
 
       setVoteData(processedData);
 
-      // Calculate total votes across all positions
-      const totalVotesCount = processedData.reduce((total, vote) => total + vote.votes, 0);
+      // Calculate total actual votes
+      const totalActualVotes = processedData.reduce((total, vote) => total + vote.votes, 0);
 
-      // Set location statistics
+      // Get voter turnout (people who have voted)
+      const { data: votedVoters } = await supabase
+        .from('voters')
+        .select('*')
+        .eq('has_voted', true);
+
+      const voterTurnout = votedVoters?.length || 0;
+
+      // Set location statistics based on actual data
       setLocationStats({
-        totalVotes: totalVotesCount,
-        voterTurnout: totalVotersWhoVoted,
+        totalVotes: totalActualVotes,
+        voterTurnout: voterTurnout,
         registeredVoters: 25000,
         lastUpdated: new Date().toLocaleString()
       });
 
-      console.log('Processed vote data:', processedData);
-      console.log('Total votes across all positions:', totalVotesCount);
+      console.log('Final processed vote data:', processedData);
+      console.log('Total actual votes:', totalActualVotes);
+      console.log('Voter turnout:', voterTurnout);
 
     } catch (error) {
       console.error('Error loading vote data:', error);
