@@ -211,28 +211,57 @@ const ClerkDashboard = () => {
   const loadVoteData = async () => {
     setLoading(true);
     try {
-      console.log('Loading vote data from database...');
+      console.log('=== DEBUGGING VOTE DATA LOADING ===');
 
-      // Fetch all votes from the database
-      const { data: votes, error: votesError } = await supabase
+      // First, let's check all possible tables that might contain vote data
+      console.log('Checking votes table...');
+      const { data: votesData, error: votesError } = await supabase
         .from('votes')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*');
+      
+      console.log('Votes table data:', votesData);
+      console.log('Votes table error:', votesError);
 
-      if (votesError) {
-        console.error('Error fetching votes:', votesError);
-        toast({
-          title: "Error",
-          description: "Failed to load vote data from database",
-          variant: "destructive",
-        });
-        return;
-      }
+      console.log('Checking voters table...');
+      const { data: votersData, error: votersError } = await supabase
+        .from('voters')
+        .select('*');
+      
+      console.log('Voters table data:', votersData);
+      console.log('Voters table error:', votersError);
 
-      console.log('Raw votes from database:', votes);
+      console.log('Checking ballots table...');
+      const { data: ballotsData, error: ballotsError } = await supabase
+        .from('ballots')
+        .select('*');
+      
+      console.log('Ballots table data:', ballotsData);
+      console.log('Ballots table error:', ballotsError);
 
-      if (!votes || votes.length === 0) {
-        console.log('No votes found in database');
+      console.log('Checking voter_ballots table...');
+      const { data: voterBallotsData, error: voterBallotsError } = await supabase
+        .from('voter_ballots')
+        .select('*');
+      
+      console.log('Voter ballots table data:', voterBallotsData);
+      console.log('Voter ballots table error:', voterBallotsError);
+
+      // Let's also check what tables exist in the database
+      console.log('Getting database schema...');
+      const { data: tablesData, error: tablesError } = await supabase
+        .rpc('pg_tables')
+        .select('tablename')
+        .eq('schemaname', 'public');
+      
+      console.log('Available tables:', tablesData);
+      console.log('Tables error:', tablesError);
+
+      // Use the votes table data if it exists
+      const votes = votesData || [];
+      console.log('Processing votes:', votes);
+
+      if (votes.length === 0) {
+        console.log('No votes found in any table');
         setVoteData([]);
         setLocationStats({
           totalVotes: 0,
@@ -245,7 +274,8 @@ const ClerkDashboard = () => {
       // Process vote data - group by position and candidate
       const votesByCandidate: { [key: string]: number } = {};
       
-      votes.forEach(vote => {
+      votes.forEach((vote: any) => {
+        console.log('Processing vote:', vote);
         const key = `${vote.position_id}-${vote.candidate_id}`;
         votesByCandidate[key] = (votesByCandidate[key] || 0) + 1;
       });
@@ -310,7 +340,7 @@ const ClerkDashboard = () => {
         });
       });
 
-      console.log('Processed vote data:', processedData);
+      console.log('Final processed vote data:', processedData);
       console.log('Total votes counted:', totalVotesCount);
 
       setVoteData(processedData);
