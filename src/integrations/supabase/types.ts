@@ -205,6 +205,47 @@ export type Database = {
         }
         Relationships: []
       }
+      election_candidates: {
+        Row: {
+          created_at: string | null
+          id: string
+          image_url: string | null
+          location_id: string | null
+          location_level: string | null
+          name: string
+          party: string
+          position_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id: string
+          image_url?: string | null
+          location_id?: string | null
+          location_level?: string | null
+          name: string
+          party: string
+          position_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          location_id?: string | null
+          location_level?: string | null
+          name?: string
+          party?: string
+          position_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "election_candidates_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       elections: {
         Row: {
           created_at: string | null
@@ -299,6 +340,27 @@ export type Database = {
           },
         ]
       }
+      positions: {
+        Row: {
+          created_at: string | null
+          id: string
+          level: string
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          id: string
+          level: string
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          level?: string
+          title?: string
+        }
+        Relationships: []
+      }
       user_sessions: {
         Row: {
           citizen_id: string
@@ -348,6 +410,38 @@ export type Database = {
             columns: ["citizen_id"]
             isOneToOne: false
             referencedRelation: "citizens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vote_tallies: {
+        Row: {
+          candidate_id: string | null
+          id: string
+          last_updated: string | null
+          location_id: string
+          vote_count: number | null
+        }
+        Insert: {
+          candidate_id?: string | null
+          id?: string
+          last_updated?: string | null
+          location_id: string
+          vote_count?: number | null
+        }
+        Update: {
+          candidate_id?: string | null
+          id?: string
+          last_updated?: string | null
+          location_id?: string
+          vote_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vote_tallies_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "election_candidates"
             referencedColumns: ["id"]
           },
         ]

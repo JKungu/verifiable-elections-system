@@ -33,6 +33,21 @@ interface LocationVoterData {
   turnoutPercentage: number;
 }
 
+interface ElectionCandidate {
+  id: string;
+  name: string;
+  party: string;
+  position_id: string;
+  location_id: string | null;
+  location_level: string | null;
+}
+
+interface Position {
+  id: string;
+  title: string;
+  level: string;
+}
+
 const ClerkDashboard = () => {
   const [location, setLocation] = useState({
     county: 'all',
@@ -42,6 +57,8 @@ const ClerkDashboard = () => {
   const [clerkData, setClerkData] = useState<ClerkData | null>(null);
   const [voteData, setVoteData] = useState<VoteData[]>([]);
   const [voterStats, setVoterStats] = useState<LocationVoterData | null>(null);
+  const [candidates, setCandidates] = useState<ElectionCandidate[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(false);
   const [isRealTimeConnected, setIsRealTimeConnected] = useState(false);
   const navigate = useNavigate();
@@ -74,7 +91,88 @@ const ClerkDashboard = () => {
       return;
     }
     setClerkData(JSON.parse(storedClerkData));
+    
+    // Load positions and initial candidates
+    loadPositions();
   }, [navigate]);
+
+  const loadPositions = async () => {
+    try {
+      const { data: positionsData, error } = await supabase
+        .from('positions')
+        .select('*')
+        .order('level', { ascending: true });
+
+      if (error) {
+        console.error('Error loading positions:', error);
+        return;
+      }
+
+      setPositions(positionsData || []);
+    } catch (error) {
+      console.error('Error loading positions:', error);
+    }
+  };
+
+  const loadCandidates = async () => {
+    try {
+      console.log('Loading candidates for location:', getLocationDisplayName());
+      
+      let query = supabase
+        .from('election_candidates')
+        .select('*');
+
+      // Always include presidential candidates (national level)
+      if (location.county === 'all') {
+        // Show only presidential candidates when no location is specified
+        query = query.eq('position_id', 'president');
+      } else {
+        // Show all relevant candidates for the selected location
+        const locationConditions = ['president']; // Always include president
+        
+        // Add county-level positions
+        if (location.county !== 'all') {
+          locationConditions.push('governor', 'women_rep');
+        }
+        
+        // Add constituency-level positions
+        if (location.constituency !== 'all') {
+          locationConditions.push('mp');
+        }
+        
+        // Add ward-level positions
+        if (location.ward !== 'all') {
+          locationConditions.push('mca');
+        }
+        
+        query = query.in('position_id', locationConditions);
+        
+        // Filter by location for non-presidential candidates
+        const locationFilter = getLocationFilter();
+        if (locationFilter) {
+          if (Array.isArray(locationFilter)) {
+            query = query.or(`location_level.eq.national,location_id.in.(${locationFilter.join(',')})`);
+          } else {
+            query = query.or(`location_level.eq.national,location_id.eq.${locationFilter}`);
+          }
+        } else {
+          query = query.or(`location_level.eq.national,location_id.eq.${location.county.toLowerCase()}`);
+        }
+      }
+
+      const { data: candidatesData, error } = await query;
+
+      if (error) {
+        console.error('Error loading candidates:', error);
+        return;
+      }
+
+      console.log('Loaded candidates:', candidatesData);
+      setCandidates(candidatesData || []);
+    } catch (error) {
+      console.error('Error loading candidates:', error);
+    }
+  };
 
   // Set up real-time subscription for votes and voters
   useEffect(() => {
@@ -135,7 +233,6 @@ const ClerkDashboard = () => {
       });
     }
 
-    // Cleanup subscriptions on unmount
     return () => {
       console.log('Cleaning up real-time subscriptions');
       supabase.removeChannel(votesChannel);
@@ -198,27 +295,6 @@ const ClerkDashboard = () => {
     return null;
   };
 
-  const getCandidateDisplayName = (candidateId: string, positionId: string) => {
-    const candidateInfo: { [key: string]: { name: string; party: string } } = {
-      '1': { name: 'John Kamau', party: 'Democratic Alliance' },
-      '2': { name: 'Mary Wanjiku', party: 'Unity Party' },
-      '3': { name: 'David Otieno', party: 'Progressive Movement' },
-      'g1': { name: 'Peter Mwangi', party: 'County First' },
-      'g2': { name: 'Grace Akinyi', party: 'Development Party' },
-      'w1': { name: 'Susan Njeri', party: 'Women First' },
-      'w2': { name: 'Margaret Wambui', party: 'Equality Party' },
-      'm1': { name: 'Robert Macharia', party: 'Grassroots Party' },
-      'm2': { name: 'Lucy Wambui', party: 'Youth Movement' },
-      'c1': { name: 'Francis Mutua', party: 'Local Development' },
-      'c2': { name: 'Catherine Wairimu', party: 'Community First' }
-    };
-
-    const candidate = candidateInfo[candidateId];
-    if (!candidate) return { name: `Candidate ${candidateId}`, party: 'Independent' };
-
-    return { name: candidate.name, party: candidate.party };
-  };
-
   const loadVoterData = async () => {
     try {
       console.log('Loading voter data for location:', getLocationDisplayName());
@@ -242,16 +318,15 @@ const ClerkDashboard = () => {
         return;
       }
 
-      // Calculate realistic numbers based on location
       let totalRegistered: number;
       if (location.county === 'all') {
-        totalRegistered = 25000; // National total
+        totalRegistered = 25000;
       } else if (location.ward !== 'all') {
-        totalRegistered = 800; // Ward-specific
+        totalRegistered = 800;
       } else if (location.constituency !== 'all') {
-        totalRegistered = 3500; // Constituency-specific
+        totalRegistered = 3500;
       } else {
-        totalRegistered = 12000; // County-specific
+        totalRegistered = 12000;
       }
 
       const totalVoted = votedVoters?.length || 0;
@@ -276,7 +351,6 @@ const ClerkDashboard = () => {
       console.log('=== LOADING VOTE DATA ===');
       console.log('Loading vote data for location:', getLocationDisplayName());
 
-      // Get location-specific voters who have voted
       let voterQuery = supabase.from('voters').select('*').eq('has_voted', true);
       
       const locationFilter = getLocationFilter();
@@ -298,7 +372,6 @@ const ClerkDashboard = () => {
       const locationVotedCount = locationVotedVoters?.length || 0;
       console.log(`Voters who voted in ${getLocationDisplayName()}:`, locationVotedCount);
 
-      // Get actual votes from database (if any)
       const { data: votes, error } = await supabase
         .from('votes')
         .select('*');
@@ -312,78 +385,51 @@ const ClerkDashboard = () => {
 
       const processedData: VoteData[] = [];
       
-      const positions = [
-        { 
-          id: 'President', 
-          position_ids: ['1'], 
-          candidates: ['1', '2', '3']
-        },
-        { 
-          id: 'Governor', 
-          position_ids: ['2'], 
-          candidates: ['g1', 'g2'] 
-        },
-        { 
-          id: 'Women Representative', 
-          position_ids: ['3'], 
-          candidates: ['w1', 'w2'] 
-        },
-        { 
-          id: 'Member of Parliament', 
-          position_ids: ['4'], 
-          candidates: ['m1', 'm2'] 
-        },
-        { 
-          id: 'Member of County Assembly', 
-          position_ids: ['5'], 
-          candidates: ['c1', 'c2'] 
+      // Group candidates by position
+      const candidatesByPosition = candidates.reduce((acc, candidate) => {
+        if (!acc[candidate.position_id]) {
+          acc[candidate.position_id] = [];
         }
-      ];
+        acc[candidate.position_id].push(candidate);
+        return acc;
+      }, {} as Record<string, ElectionCandidate[]>);
 
-      // If there are location-specific voted voters, distribute votes realistically for that location
-      if (locationVotedCount > 0) {
-        console.log('Distributing votes based on location-specific voter participation');
-        
-        positions.forEach(position => {
-          // Create realistic vote distribution for each position based on location voters
-          const baseVotes = Math.floor(locationVotedCount / position.candidates.length);
-          const remainder = locationVotedCount % position.candidates.length;
+      // Create vote data for each position
+      Object.entries(candidatesByPosition).forEach(([positionId, positionCandidates]) => {
+        const position = positions.find(p => p.id === positionId);
+        if (!position) return;
+
+        if (locationVotedCount > 0) {
+          const baseVotes = Math.floor(locationVotedCount / positionCandidates.length);
+          const remainder = locationVotedCount % positionCandidates.length;
           
-          position.candidates.forEach((candidateId, index) => {
-            // Add some variance to make it realistic (±20% of base)
+          positionCandidates.forEach((candidate, index) => {
             const variance = Math.floor(Math.random() * (baseVotes * 0.4)) - (baseVotes * 0.2);
             let candidateVotes = baseVotes + (index < remainder ? 1 : 0) + variance;
-            candidateVotes = Math.max(0, candidateVotes); // Ensure no negative votes
-            
-            const candidateInfo = getCandidateDisplayName(candidateId, position.id);
+            candidateVotes = Math.max(0, candidateVotes);
             
             processedData.push({
-              position: position.id,
-              candidate_id: candidateId,
-              candidate_name: candidateInfo.name,
-              party: candidateInfo.party,
+              position: position.title,
+              candidate_id: candidate.id,
+              candidate_name: candidate.name,
+              party: candidate.party,
               votes: candidateVotes,
               location: getLocationDisplayName()
             });
           });
-        });
-      } else {
-        // No votes in this location yet
-        positions.forEach(position => {
-          position.candidates.forEach(candidateId => {
-            const candidateInfo = getCandidateDisplayName(candidateId, position.id);
-            
+        } else {
+          positionCandidates.forEach(candidate => {
             processedData.push({
-              position: position.id,
-              candidate_id: candidateId,
-              candidate_name: candidateInfo.name,
-              party: candidateInfo.party,
+              position: position.title,
+              candidate_id: candidate.id,
+              candidate_name: candidate.name,
+              party: candidate.party,
               votes: 0,
               location: getLocationDisplayName()
             });
           });
-        });
-      }
+        }
+      });
 
       console.log('Final processed vote data for location:', processedData);
       setVoteData(processedData);
@@ -404,9 +450,15 @@ const ClerkDashboard = () => {
 
   // Load data when component mounts and when location changes
   useEffect(() => {
-    loadVoterData();
-    loadVoteData();
+    loadCandidates();
   }, [location]);
+
+  useEffect(() => {
+    if (candidates.length > 0) {
+      loadVoterData();
+      loadVoteData();
+    }
+  }, [candidates]);
 
   const handleLogout = () => {
     localStorage.removeItem('clerkData');
@@ -454,26 +506,31 @@ const ClerkDashboard = () => {
     return <div>Loading...</div>;
   }
 
-  const electionPositions = [
-    { id: 'President', icon: '🏛️', description: 'Presidential Election' },
-    { id: 'Governor', icon: '🏢', description: 'County Governor' },
-    { id: 'Women Representative', icon: '👩‍💼', description: 'Women Representative' },
-    { id: 'Member of Parliament', icon: '🏛️', description: 'Parliamentary Seat' },
-    { id: 'Member of County Assembly', icon: '🏛️', description: 'County Assembly Seat' }
-  ];
+  // Get unique positions from current vote data
+  const availablePositions = Array.from(new Set(voteData.map(vote => vote.position)));
 
-  const renderPositionTable = (position: any) => {
-    const positionVotes = voteData.filter(vote => vote.position === position.id);
+  const renderPositionTable = (positionTitle: string) => {
+    const positionVotes = voteData.filter(vote => vote.position === positionTitle);
     const totalVotes = positionVotes.reduce((total, vote) => total + vote.votes, 0);
     const sortedVotes = positionVotes.sort((a, b) => b.votes - a.votes);
 
+    // Get position icon based on title
+    const getPositionIcon = (title: string) => {
+      if (title.includes('President')) return '🏛️';
+      if (title.includes('Governor')) return '🏢';
+      if (title.includes('Women')) return '👩‍💼';
+      if (title.includes('Parliament')) return '🏛️';
+      if (title.includes('Assembly')) return '🏛️';
+      return '🗳️';
+    };
+
     return (
-      <Card key={position.id} className="mb-6 bg-gray-900 border-gray-700">
+      <Card key={positionTitle} className="mb-6 bg-gray-900 border-gray-700">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-lg text-white">
-              <span className="text-xl">{position.icon}</span>
-              {position.id}
+              <span className="text-xl">{getPositionIcon(positionTitle)}</span>
+              {positionTitle}
             </CardTitle>
             <div className="flex gap-2">
               <Badge variant="outline" className="bg-gray-800 border-gray-600 text-gray-200">
@@ -602,7 +659,10 @@ const ClerkDashboard = () => {
               Select Location to Monitor
             </CardTitle>
             <CardDescription className="text-gray-300">
-              Choose a specific location to view detailed voting statistics and candidate performance for that area only
+              {location.county === 'all' 
+                ? 'Currently showing presidential candidates only. Select a location to see all electoral positions.' 
+                : 'Choose a specific location to view detailed voting statistics and candidate performance for that area only'
+              }
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -660,13 +720,13 @@ const ClerkDashboard = () => {
                 </Select>
               </div>
             </div>
-            {location.ward !== 'all' && (
+            {location.county !== 'all' && (
               <div className="mt-4 p-3 bg-blue-900/20 rounded-lg border border-blue-700">
                 <div className="text-sm text-blue-300">
                   📍 Showing data specifically for <strong>{getLocationDisplayName()}</strong>
                 </div>
                 <div className="text-xs text-blue-400 mt-1">
-                  Voter participation and vote counts are filtered to this ward only
+                  Voter participation and vote counts are filtered to this location
                 </div>
               </div>
             )}
@@ -743,20 +803,34 @@ const ClerkDashboard = () => {
         <Card className="mb-6 bg-gray-900 border-gray-700">
           <CardHeader>
             <CardTitle className="text-white">Quick Vote Summary - {getLocationDisplayName()}</CardTitle>
-            <CardDescription className="text-gray-300">Current vote distribution by electoral positions</CardDescription>
+            <CardDescription className="text-gray-300">
+              {location.county === 'all' 
+                ? 'Currently showing presidential candidates only' 
+                : 'Current vote distribution by electoral positions'
+              }
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {electionPositions.map((position) => {
-                const positionVotes = voteData.filter(vote => vote.position === position.id);
+              {availablePositions.map((positionTitle) => {
+                const positionVotes = voteData.filter(vote => vote.position === positionTitle);
                 const totalVotes = positionVotes.reduce((total, vote) => total + vote.votes, 0);
                 const leader = positionVotes.sort((a, b) => b.votes - a.votes)[0];
                 
+                const getPositionIcon = (title: string) => {
+                  if (title.includes('President')) return '🏛️';
+                  if (title.includes('Governor')) return '🏢';
+                  if (title.includes('Women')) return '👩‍💼';
+                  if (title.includes('Parliament')) return '🏛️';
+                  if (title.includes('Assembly')) return '🏛️';
+                  return '🗳️';
+                };
+                
                 return (
-                  <div key={position.id} className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                  <div key={positionTitle} className="bg-gray-800 p-4 rounded-lg border border-gray-700">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-lg">{position.icon}</span>
-                      <div className="text-sm font-medium text-gray-200">{position.id}</div>
+                      <span className="text-lg">{getPositionIcon(positionTitle)}</span>
+                      <div className="text-sm font-medium text-gray-200">{positionTitle}</div>
                     </div>
                     <div className="text-xs text-gray-400 mb-1">
                       Leading: {leader?.candidate_name || 'None'}
@@ -778,7 +852,10 @@ const ClerkDashboard = () => {
               Detailed Election Results by Position - {getLocationDisplayName()}
             </h2>
             <p className="text-gray-300 mt-2">
-              Real-time vote counts and candidate performance across all electoral positions
+              {location.county === 'all' 
+                ? 'Real-time presidential vote counts. Select a location to see all electoral positions.' 
+                : 'Real-time vote counts and candidate performance across all electoral positions'
+              }
             </p>
           </div>
 
@@ -790,7 +867,7 @@ const ClerkDashboard = () => {
               </CardContent>
             </Card>
           ) : (
-            electionPositions.map(renderPositionTable)
+            availablePositions.map(renderPositionTable)
           )}
         </div>
       </div>

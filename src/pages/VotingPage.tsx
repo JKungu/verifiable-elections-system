@@ -22,58 +22,31 @@ interface Position {
 }
 
 interface VoteSelection {
-  [positionId: string]: string; // position -> candidate id
+  [positionId: string]: string;
+}
+
+interface ElectionCandidate {
+  id: string;
+  name: string;
+  party: string;
+  position_id: string;
+  location_id: string | null;
+  location_level: string | null;
+}
+
+interface DatabasePosition {
+  id: string;
+  title: string;
+  level: string;
 }
 
 const VotingPage = () => {
-  const [positions] = useState<Position[]>([
-    {
-      id: '1',
-      title: 'President of Kenya',
-      candidates: [
-        { id: '1', name: 'John Kamau', party: 'Democratic Alliance' },
-        { id: '2', name: 'Mary Wanjiku', party: 'Unity Party' },
-        { id: '3', name: 'David Otieno', party: 'Progressive Movement' }
-      ]
-    },
-    {
-      id: '2',
-      title: 'Governor',
-      candidates: [
-        { id: 'g1', name: 'Peter Mwangi', party: 'County First' },
-        { id: 'g2', name: 'Grace Akinyi', party: 'Development Party' }
-      ]
-    },
-    {
-      id: '3',
-      title: 'Women Representative',
-      candidates: [
-        { id: 'w1', name: 'Susan Njeri', party: 'Women First' },
-        { id: 'w2', name: 'Margaret Wambui', party: 'Equality Party' }
-      ]
-    },
-    {
-      id: '4',
-      title: 'Member of Parliament',
-      candidates: [
-        { id: 'm1', name: 'Robert Macharia', party: 'Grassroots Party' },
-        { id: 'm2', name: 'Lucy Wambui', party: 'Youth Movement' }
-      ]
-    },
-    {
-      id: '5',
-      title: 'Member of County Assembly',
-      candidates: [
-        { id: 'c1', name: 'Francis Mutua', party: 'Local Development' },
-        { id: 'c2', name: 'Catherine Wairimu', party: 'Community First' }
-      ]
-    }
-  ]);
-
+  const [positions, setPositions] = useState<Position[]>([]);
   const [selections, setSelections] = useState<VoteSelection>({});
   const [currentPositionIndex, setCurrentPositionIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [voterData, setVoterData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -92,7 +65,119 @@ const VotingPage = () => {
       return;
     }
     setVoterData(voter);
+    loadCandidatesForVoter(voter);
   }, [location.state, navigate, toast]);
+
+  const loadCandidatesForVoter = async (voter: any) => {
+    try {
+      setLoading(true);
+      console.log('Loading candidates for voter location:', voter.location_id);
+
+      // First get all positions
+      const { data: dbPositions, error: positionsError } = await supabase
+        .from('positions')
+        .select('*')
+        .order('level', { ascending: true });
+
+      if (positionsError) {
+        console.error('Error loading positions:', positionsError);
+        return;
+      }
+
+      // Then get candidates based on voter's location
+      let candidatesQuery = supabase
+        .from('election_candidates')
+        .select('*');
+
+      // Get the voter's location hierarchy to determine which candidates to show
+      const voterLocationId = voter.location_id;
+      
+      if (voterLocationId) {
+        // Show candidates relevant to this voter's location:
+        // - National candidates (president)
+        // - County candidates (governor, women rep) if location matches
+        // - Constituency candidates (MP) if location matches
+        // - Ward candidates (MCA) if location matches
+        
+        candidatesQuery = candidatesQuery.or(
+          `location_level.eq.national,` +
+          `and(location_level.eq.county,location_id.eq.${getCountyFromLocationId(voterLocationId)}),` +
+          `and(location_level.eq.constituency,location_id.eq.${getConstituencyFromLocationId(voterLocationId)}),` +
+          `and(location_level.eq.ward,location_id.eq.${voterLocationId})`
+        );
+      } else {
+        // Default to showing only national candidates if no location
+        candidatesQuery = candidatesQuery.eq('location_level', 'national');
+      }
+
+      const { data: candidates, error: candidatesError } = await candidatesQuery;
+
+      if (candidatesError) {
+        console.error('Error loading candidates:', candidatesError);
+        return;
+      }
+
+      console.log('Loaded candidates:', candidates);
+
+      // Group candidates by position
+      const candidatesByPosition = candidates?.reduce((acc, candidate) => {
+        if (!acc[candidate.position_id]) {
+          acc[candidate.position_id] = [];
+        }
+        acc[candidate.position_id].push({
+          id: candidate.id,
+          name: candidate.name,
+          party: candidate.party
+        });
+        return acc;
+      }, {} as Record<string, Candidate[]>) || {};
+
+      // Create positions array with their candidates
+      const formattedPositions: Position[] = dbPositions
+        ?.filter(pos => candidatesByPosition[pos.id] && candidatesByPosition[pos.id].length > 0)
+        .map(pos => ({
+          id: pos.id,
+          title: pos.title,
+          candidates: candidatesByPosition[pos.id] || []
+        })) || [];
+
+      console.log('Formatted positions:', formattedPositions);
+      setPositions(formattedPositions);
+
+    } catch (error) {
+      console.error('Error loading voter candidates:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load candidates for your location",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper functions to extract location hierarchy
+  const getCountyFromLocationId = (locationId: string) => {
+    // This should match the county from your Kenya locations data
+    // For now, we'll use a simple mapping
+    if (locationId.includes('nairobi') || locationId === 'parklands' || locationId === 'westlands') {
+      return 'nairobi';
+    }
+    if (locationId.includes('mombasa')) {
+      return 'mombasa';
+    }
+    // Add more mappings as needed
+    return 'nairobi'; // Default
+  };
+
+  const getConstituencyFromLocationId = (locationId: string) => {
+    // Map ward to constituency
+    if (locationId === 'parklands') {
+      return 'westlands';
+    }
+    // Add more mappings as needed
+    return 'westlands'; // Default
+  };
 
   const handleCandidateSelect = (positionId: string, candidateId: string) => {
     setSelections(prev => ({
@@ -141,7 +226,6 @@ const VotingPage = () => {
       // PHASE 1: CRITICAL PRE-CHECKS
       console.log('PHASE 1: Running critical pre-checks...');
       
-      // Verify voter exists and hasn't voted
       const { data: currentVoter, error: voterCheckError } = await supabase
         .from('voters')
         .select('id, has_voted, first_name, last_name, id_number')
@@ -235,7 +319,7 @@ const VotingPage = () => {
 
       console.log('✅ Votes verified in database:', verificationVotes);
 
-      // PHASE 5: MARK VOTER AS VOTED (ONLY AFTER SUCCESSFUL VERIFICATION)
+      // PHASE 5: MARK VOTER AS VOTED
       console.log('PHASE 5: Marking voter as voted...');
       
       const { data: updatedVoter, error: updateError } = await supabase
@@ -250,7 +334,6 @@ const VotingPage = () => {
 
       if (updateError) {
         console.error('Failed to mark voter as voted:', updateError);
-        // This is critical - votes are saved but voter not marked
         throw new Error(`CRITICAL: Votes saved but voter update failed: ${updateError.message}`);
       }
 
@@ -289,8 +372,6 @@ const VotingPage = () => {
       }
 
       console.log('✅ FINAL VERIFICATION SUCCESSFUL');
-      console.log('Final votes:', finalVotes);
-      console.log('Final voter state:', finalVoter);
       console.log('=== BULLETPROOF VOTE SUBMISSION COMPLETED ===');
 
       toast({
@@ -308,7 +389,6 @@ const VotingPage = () => {
     } catch (error: any) {
       console.error('=== VOTE SUBMISSION FAILED ===');
       console.error('Error:', error);
-      console.error('Stack:', error.stack);
       
       toast({
         title: "Vote Submission Failed",
@@ -323,6 +403,38 @@ const VotingPage = () => {
 
   if (!voterData) {
     return <div>Loading...</div>;
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+        <div className="max-w-4xl mx-auto">
+          <Card>
+            <CardContent className="text-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p>Loading candidates for your location...</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (positions.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+        <div className="max-w-4xl mx-auto">
+          <Card>
+            <CardContent className="text-center py-12">
+              <p>No candidates available for your location. Please contact election officials.</p>
+              <Button onClick={() => navigate('/voter-login')} className="mt-4">
+                Back to Login
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
   }
 
   const currentPosition = positions[currentPositionIndex];
