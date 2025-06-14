@@ -134,7 +134,7 @@ const ClerkDashboard = () => {
         if (locationIds.length > 0) {
           // Show presidential + location-specific candidates
           query = query.or(
-            `location_level.eq.national,` +
+            `position_id.eq.president,` +
             `location_id.in.(${locationIds.join(',')})`
           );
         } else {
