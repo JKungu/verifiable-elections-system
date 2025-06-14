@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { MapPin, LogOut, Shield, Download, Radio, Users, Vote, BarChart3, TrendingUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -421,6 +421,96 @@ const ClerkDashboard = () => {
     { id: 'Member of County Assembly', icon: '🏛️', description: 'County Assembly Seat' }
   ];
 
+  const renderPositionTable = (position: any) => {
+    const positionVotes = voteData.filter(vote => vote.position === position.id);
+    const totalVotes = positionVotes.reduce((total, vote) => total + vote.votes, 0);
+    const sortedVotes = positionVotes.sort((a, b) => b.votes - a.votes);
+
+    return (
+      <Card key={position.id} className="mb-6">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <span className="text-xl">{position.icon}</span>
+              {position.id}
+            </CardTitle>
+            <div className="flex gap-2">
+              <Badge variant="outline" className="bg-blue-50">
+                Turnout: {totalVotes}
+              </Badge>
+              <Badge variant="outline" className="bg-green-50">
+                {sortedVotes.length} Candidates
+              </Badge>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {sortedVotes.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="font-semibold">Candidate</TableHead>
+                  <TableHead className="font-semibold">Party</TableHead>
+                  <TableHead className="font-semibold text-center">Votes</TableHead>
+                  <TableHead className="font-semibold text-center">Percentage</TableHead>
+                  <TableHead className="font-semibold text-center">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedVotes.map((vote, index) => {
+                  const percentage = totalVotes > 0 ? (vote.votes / totalVotes * 100) : 0;
+                  const isLeading = index === 0 && totalVotes > 0;
+                  
+                  return (
+                    <TableRow key={vote.candidate_id} className={isLeading ? 'bg-green-50' : ''}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {isLeading && <span className="text-lg">🏆</span>}
+                          {vote.candidate_name}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          {vote.party}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className={`font-bold ${isLeading ? 'text-green-600' : ''}`}>
+                          {vote.votes.toLocaleString()}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className={`font-medium ${isLeading ? 'text-green-600' : ''}`}>
+                          {percentage.toFixed(1)}%
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {isLeading ? (
+                          <Badge className="bg-green-100 text-green-800 border-green-200">
+                            Leading
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-gray-600">
+                            #{index + 1}
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-4xl mb-2">📊</div>
+              <p>No votes recorded yet for this position</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="max-w-7xl mx-auto">
@@ -434,7 +524,7 @@ const ClerkDashboard = () => {
                 </div>
                 <div>
                   <CardTitle className="text-2xl flex items-center gap-2">
-                    Election Clerk Dashboard
+                    Election Monitoring Dashboard
                     <div className="flex items-center gap-1">
                       <Radio className={`h-4 w-4 ${isRealTimeConnected ? 'text-green-500' : 'text-red-500'}`} />
                       <span className={`text-sm font-medium ${isRealTimeConnected ? 'text-green-600' : 'text-red-600'}`}>
@@ -443,7 +533,7 @@ const ClerkDashboard = () => {
                     </div>
                   </CardTitle>
                   <CardDescription>
-                    Welcome, {clerkData.name} (Reg: {clerkData.registrationNumber}) - Real-time vote monitoring
+                    Welcome, {clerkData.name} (Reg: {clerkData.registrationNumber}) - Real-time vote monitoring and analytics
                   </CardDescription>
                 </div>
               </div>
@@ -451,7 +541,7 @@ const ClerkDashboard = () => {
                 {voteData.length > 0 && (
                   <Button onClick={exportData} variant="outline">
                     <Download className="h-4 w-4 mr-2" />
-                    Export Data
+                    Export
                   </Button>
                 )}
                 <Button onClick={handleLogout} variant="outline">
@@ -471,7 +561,7 @@ const ClerkDashboard = () => {
               Select Location to Monitor
             </CardTitle>
             <CardDescription>
-              Choose a specific location to view detailed voting statistics
+              Choose a specific location to view detailed voting statistics and candidate performance
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -532,15 +622,15 @@ const ClerkDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Overview Statistics */}
+        {/* Real-time Election Statistics */}
         {voterStats && (
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5" />
-                Overview Statistics - {getLocationDisplayName()}
+                Real-time Election Statistics - {getLocationDisplayName()}
                 <Badge variant={isRealTimeConnected ? "default" : "destructive"}>
-                  {isRealTimeConnected ? "LIVE" : "OFFLINE"}
+                  {isRealTimeConnected ? "LIVE DATA" : "OFFLINE"}
                 </Badge>
               </CardTitle>
             </CardHeader>
@@ -598,14 +688,46 @@ const ClerkDashboard = () => {
           </Card>
         )}
 
-        {/* Vote Results by Position */}
+        {/* Quick Vote Summary */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Quick Vote Summary - {getLocationDisplayName()}</CardTitle>
+            <CardDescription>Current vote distribution by electoral positions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {electionPositions.map((position) => {
+                const positionVotes = voteData.filter(vote => vote.position === position.id);
+                const totalVotes = positionVotes.reduce((total, vote) => total + vote.votes, 0);
+                const leader = positionVotes.sort((a, b) => b.votes - a.votes)[0];
+                
+                return (
+                  <div key={position.id} className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">{position.icon}</span>
+                      <div className="text-sm font-medium">{position.id}</div>
+                    </div>
+                    <div className="text-xs text-gray-600 mb-1">
+                      Leading: {leader?.candidate_name || 'None'}
+                    </div>
+                    <div className="text-lg font-bold text-blue-600">
+                      {totalVotes.toLocaleString()} votes
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Detailed Election Results by Position */}
         <div className="space-y-6">
           <div className="text-center mb-6">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Vote Results by Position - {getLocationDisplayName()}
+              Detailed Election Results by Position - {getLocationDisplayName()}
             </h2>
             <p className="text-gray-600 dark:text-gray-300 mt-2">
-              Real-time vote counts and candidate performance
+              Real-time vote counts and candidate performance across all electoral positions
             </p>
           </div>
 
@@ -617,64 +739,7 @@ const ClerkDashboard = () => {
               </CardContent>
             </Card>
           ) : (
-            electionPositions.map((position) => {
-              const positionVotes = voteData.filter(vote => vote.position === position.id);
-              const totalVotes = positionVotes.reduce((total, vote) => total + vote.votes, 0);
-              const sortedVotes = positionVotes.sort((a, b) => b.votes - a.votes);
-
-              return (
-                <Card key={position.id} className="mb-4">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <span className="text-xl">{position.icon}</span>
-                      {position.id}
-                      <Badge variant="outline">{totalVotes} total votes</Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {sortedVotes.length > 0 ? (
-                      <div className="space-y-3">
-                        {sortedVotes.map((vote, index) => {
-                          const percentage = totalVotes > 0 ? (vote.votes / totalVotes * 100) : 0;
-                          const isLeading = index === 0 && totalVotes > 0;
-                          
-                          return (
-                            <div key={vote.candidate_id} className={`p-3 rounded-lg border ${isLeading ? 'bg-green-50 border-green-200' : 'bg-gray-50'}`}>
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  {isLeading && <span className="text-lg">🏆</span>}
-                                  <div>
-                                    <h4 className={`font-semibold ${isLeading ? 'text-green-700' : ''}`}>
-                                      {vote.candidate_name}
-                                    </h4>
-                                    <Badge variant="outline" className="text-xs">
-                                      {vote.party}
-                                    </Badge>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <div className={`text-xl font-bold ${isLeading ? 'text-green-600' : ''}`}>
-                                    {vote.votes}
-                                  </div>
-                                  <div className="text-sm text-gray-500">
-                                    {percentage.toFixed(1)}%
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-gray-500">
-                        <div className="text-4xl mb-2">📊</div>
-                        <p>No votes recorded yet for this position</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })
+            electionPositions.map(renderPositionTable)
           )}
         </div>
       </div>
