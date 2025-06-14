@@ -213,7 +213,7 @@ const ClerkDashboard = () => {
     try {
       console.log('=== DEBUGGING VOTE DATA LOADING ===');
 
-      // First, let's check all possible tables that might contain vote data
+      // Check the votes table first
       console.log('Checking votes table...');
       const { data: votesData, error: votesError } = await supabase
         .from('votes')
@@ -222,14 +222,17 @@ const ClerkDashboard = () => {
       console.log('Votes table data:', votesData);
       console.log('Votes table error:', votesError);
 
+      // Check the voters table to see who has voted
       console.log('Checking voters table...');
       const { data: votersData, error: votersError } = await supabase
         .from('voters')
-        .select('*');
+        .select('*')
+        .eq('has_voted', true);
       
-      console.log('Voters table data:', votersData);
+      console.log('Voters who have voted:', votersData);
       console.log('Voters table error:', votersError);
 
+      // Check ballots table
       console.log('Checking ballots table...');
       const { data: ballotsData, error: ballotsError } = await supabase
         .from('ballots')
@@ -238,6 +241,7 @@ const ClerkDashboard = () => {
       console.log('Ballots table data:', ballotsData);
       console.log('Ballots table error:', ballotsError);
 
+      // Check voter_ballots table
       console.log('Checking voter_ballots table...');
       const { data: voterBallotsData, error: voterBallotsError } = await supabase
         .from('voter_ballots')
@@ -246,26 +250,30 @@ const ClerkDashboard = () => {
       console.log('Voter ballots table data:', voterBallotsData);
       console.log('Voter ballots table error:', voterBallotsError);
 
-      // Let's also check what tables exist in the database
-      console.log('Getting database schema...');
-      const { data: tablesData, error: tablesError } = await supabase
-        .rpc('pg_tables')
-        .select('tablename')
-        .eq('schemaname', 'public');
-      
-      console.log('Available tables:', tablesData);
-      console.log('Tables error:', tablesError);
-
-      // Use the votes table data if it exists
+      // Use the votes table data if it exists, otherwise try to work with available data
       const votes = votesData || [];
       console.log('Processing votes:', votes);
 
+      // If we have no votes in the votes table but have voters who voted, 
+      // this indicates a data consistency issue
+      if (votes.length === 0 && votersData && votersData.length > 0) {
+        console.log('ISSUE FOUND: Voters have voted but no votes recorded in votes table');
+        console.log(`Found ${votersData.length} voters who have voted, but 0 votes in votes table`);
+        
+        // For now, show a message to the user about this data inconsistency
+        toast({
+          title: "Data Inconsistency Detected",
+          description: `Found ${votersData.length} voters who have voted, but no vote records. This may indicate a database sync issue.`,
+          variant: "destructive",
+        });
+      }
+
       if (votes.length === 0) {
-        console.log('No votes found in any table');
+        console.log('No votes found in votes table');
         setVoteData([]);
         setLocationStats({
           totalVotes: 0,
-          voterTurnout: 0,
+          voterTurnout: votersData ? votersData.length : 0, // Show voter turnout even if votes aren't recorded properly
           lastUpdated: new Date().toLocaleString()
         });
         return;
@@ -348,7 +356,7 @@ const ClerkDashboard = () => {
       // Set location statistics
       setLocationStats({
         totalVotes: totalVotesCount,
-        voterTurnout: totalVotesCount,
+        voterTurnout: votersData ? votersData.length : totalVotesCount, // Use actual voter count if available
         lastUpdated: new Date().toLocaleString()
       });
 
