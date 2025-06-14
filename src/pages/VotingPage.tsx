@@ -199,6 +199,19 @@ const VotingPage = () => {
 
       console.log('Successfully inserted votes:', insertedVotes);
 
+      // Verify votes were actually inserted by checking the database
+      console.log('Verifying votes were inserted...');
+      const { data: verifyVotes, error: verifyError } = await supabase
+        .from('votes')
+        .select('*')
+        .eq('voter_id', voterData.id);
+
+      if (verifyError) {
+        console.error('Error verifying votes:', verifyError);
+      } else {
+        console.log('Verification - Votes found in database:', verifyVotes);
+      }
+
       // Update voter status to has_voted = true
       console.log('Updating voter status...');
       const { data: updatedVoter, error: voterUpdateError } = await supabase

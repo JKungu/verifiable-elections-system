@@ -289,9 +289,10 @@ const ClerkDashboard = () => {
   const loadVoteData = async () => {
     setLoading(true);
     try {
+      console.log('=== LOADING VOTE DATA ===');
       console.log('Loading vote data for location:', getLocationDisplayName());
 
-      // Get actual votes from database only
+      // Get actual votes from database
       const { data: votes, error } = await supabase
         .from('votes')
         .select('*');
@@ -302,6 +303,7 @@ const ClerkDashboard = () => {
       }
 
       console.log('Raw votes from database:', votes);
+      console.log('Number of votes in database:', votes?.length || 0);
 
       // Process vote data - group by position and candidate, counting only actual votes
       const votesByCandidate: { [key: string]: number } = {};
@@ -309,6 +311,7 @@ const ClerkDashboard = () => {
       (votes || []).forEach((vote: any) => {
         const key = `${vote.position_id}-${vote.candidate_id}`;
         votesByCandidate[key] = (votesByCandidate[key] || 0) + 1;
+        console.log(`Vote found: Position ${vote.position_id}, Candidate ${vote.candidate_id}, Voter ${vote.voter_id}`);
       });
 
       console.log('Processed votes by candidate:', votesByCandidate);
@@ -344,35 +347,41 @@ const ClerkDashboard = () => {
         }
       ];
 
-      // For each position, show only actual votes - no simulation
+      // For each position, show actual votes
       positions.forEach(position => {
+        console.log(`Processing position: ${position.id}`);
         position.candidates.forEach(candidateId => {
           let actualVotes = 0;
           
           // Count actual votes for this candidate across all position IDs
           position.position_ids.forEach(positionId => {
             const key = `${positionId}-${candidateId}`;
-            actualVotes += votesByCandidate[key] || 0;
+            const voteCount = votesByCandidate[key] || 0;
+            actualVotes += voteCount;
+            console.log(`  Candidate ${candidateId} in position ${positionId}: ${voteCount} votes`);
           });
 
           const candidateInfo = getCandidateDisplayName(candidateId, position.id);
           
-          // Only add candidates who have received actual votes, or show 0 for all candidates
+          console.log(`  Total votes for ${candidateInfo.name}: ${actualVotes}`);
+          
           processedData.push({
             position: position.id,
             candidate_id: candidateId,
             candidate_name: candidateInfo.name,
             party: candidateInfo.party,
-            votes: actualVotes, // Show only actual votes, no simulation
+            votes: actualVotes,
             location: getLocationDisplayName()
           });
         });
       });
 
+      console.log('Final processed vote data:', processedData);
       setVoteData(processedData);
 
       // Calculate total actual votes
       const totalActualVotes = processedData.reduce((total, vote) => total + vote.votes, 0);
+      console.log('Total actual votes across all positions:', totalActualVotes);
 
       // Get voter turnout (people who have voted)
       const { data: votedVoters } = await supabase
@@ -381,6 +390,7 @@ const ClerkDashboard = () => {
         .eq('has_voted', true);
 
       const voterTurnout = votedVoters?.length || 0;
+      console.log('Voter turnout (people who voted):', voterTurnout);
 
       // Set location statistics based on actual data
       setLocationStats({
@@ -390,9 +400,7 @@ const ClerkDashboard = () => {
         lastUpdated: new Date().toLocaleString()
       });
 
-      console.log('Final processed vote data:', processedData);
-      console.log('Total actual votes:', totalActualVotes);
-      console.log('Voter turnout:', voterTurnout);
+      console.log('=== VOTE DATA LOADING COMPLETED ===');
 
     } catch (error) {
       console.error('Error loading vote data:', error);
