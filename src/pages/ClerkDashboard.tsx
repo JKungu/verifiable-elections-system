@@ -141,12 +141,59 @@ const ClerkDashboard = () => {
     }));
   };
 
+  const getLocationDisplayName = () => {
+    if (location.county === 'all') return 'All Locations';
+    
+    let displayName = location.county;
+    if (location.constituency !== 'all') {
+      displayName += `, ${location.constituency}`;
+    }
+    if (location.ward !== 'all') {
+      displayName += `, ${location.ward}`;
+    }
+    return displayName;
+  };
+
+  const getCandidateDisplayName = (candidateId: string, positionId: string) => {
+    // Base candidate information
+    const candidateInfo: { [key: string]: { name: string; party: string } } = {
+      'p1': { name: 'John Kamau', party: 'Democratic Alliance' },
+      'p2': { name: 'Mary Wanjiku', party: 'Unity Party' },
+      'p3': { name: 'David Otieno', party: 'Progressive Movement' },
+      'g1': { name: 'Peter Mwangi', party: 'County First' },
+      'g2': { name: 'Grace Akinyi', party: 'Development Party' },
+      'w1': { name: 'Susan Njeri', party: 'Women First' },
+      'w2': { name: 'Margaret Wambui', party: 'Equality Party' },
+      'm1': { name: 'Robert Macharia', party: 'Grassroots Party' },
+      'm2': { name: 'Lucy Wambui', party: 'Youth Movement' },
+      'c1': { name: 'Francis Mutua', party: 'Local Development' },
+      'c2': { name: 'Catherine Wairimu', party: 'Community First' }
+    };
+
+    const candidate = candidateInfo[candidateId];
+    if (!candidate) return { name: `Unknown Candidate (${candidateId})`, party: 'Independent' };
+
+    // Add location context for local positions
+    let name = candidate.name;
+    if (positionId === 'Governor' && location.county !== 'all') {
+      name += ` (${location.county})`;
+    } else if (positionId === 'Women Representative' && location.county !== 'all') {
+      name += ` (${location.county})`;
+    } else if (positionId === 'Member of Parliament' && location.constituency !== 'all') {
+      name += ` (${location.constituency})`;
+    } else if (positionId === 'Member of County Assembly' && location.ward !== 'all') {
+      name += ` (${location.ward})`;
+    }
+
+    return { name, party: candidate.party };
+  };
+
   const loadVoteData = async () => {
     setLoading(true);
     try {
       console.log('Loading real-time vote data...');
 
-      // Fetch all votes from the database
+      // Fetch all votes from the database - no location filtering at database level
       const { data: votes, error: votesError } = await supabase
         .from('votes')
         .select(`
@@ -178,21 +225,6 @@ const ClerkDashboard = () => {
 
       console.log('Votes by candidate:', votesByCandidate);
 
-      // Create candidate information based on the database structure
-      const candidateInfo: { [key: string]: { name: string; party: string } } = {
-        'p1': { name: 'John Kamau', party: 'Democratic Alliance' },
-        'p2': { name: 'Mary Wanjiku', party: 'Unity Party' },
-        'p3': { name: 'David Otieno', party: 'Progressive Movement' },
-        'g1': { name: `Peter Mwangi (${location.county !== 'all' ? location.county : 'County'})`, party: 'County First' },
-        'g2': { name: `Grace Akinyi (${location.county !== 'all' ? location.county : 'County'})`, party: 'Development Party' },
-        'w1': { name: `Susan Njeri (${location.county !== 'all' ? location.county : 'County'})`, party: 'Women First' },
-        'w2': { name: `Margaret Wambui (${location.county !== 'all' ? location.county : 'County'})`, party: 'Equality Party' },
-        'm1': { name: `Robert Macharia (${location.constituency !== 'all' ? location.constituency : location.county !== 'all' ? location.county : 'Constituency'})`, party: 'Grassroots Party' },
-        'm2': { name: `Lucy Wambui (${location.constituency !== 'all' ? location.constituency : location.county !== 'all' ? location.county : 'Constituency'})`, party: 'Youth Movement' },
-        'c1': { name: `Francis Mutua (${location.ward !== 'all' ? location.ward : location.constituency !== 'all' ? location.constituency : location.county !== 'all' ? location.county : 'Ward'})`, party: 'Local Development' },
-        'c2': { name: `Catherine Wairimu (${location.ward !== 'all' ? location.ward : location.constituency !== 'all' ? location.constituency : location.county !== 'all' ? location.county : 'Ward'})`, party: 'Community First' }
-      };
-
       const processedData: VoteData[] = [];
       
       // Process each position
@@ -211,18 +243,17 @@ const ClerkDashboard = () => {
           const key = `${position.id}-${candidateId}`;
           const votes = votesByCandidate[key] || 0;
           totalVotesCount += votes;
-          const candidate = candidateInfo[candidateId];
           
-          if (candidate) {
-            processedData.push({
-              position: position.id,
-              candidate_id: candidateId,
-              candidate_name: candidate.name,
-              party: candidate.party,
-              votes: votes,
-              location: location.county !== 'all' ? `${location.county}${location.constituency !== 'all' ? `, ${location.constituency}` : ''}${location.ward !== 'all' ? `, ${location.ward}` : ''}` : 'All Locations'
-            });
-          }
+          const candidateInfo = getCandidateDisplayName(candidateId, position.id);
+          
+          processedData.push({
+            position: position.id,
+            candidate_id: candidateId,
+            candidate_name: candidateInfo.name,
+            party: candidateInfo.party,
+            votes: votes,
+            location: getLocationDisplayName()
+          });
         });
       });
 
@@ -426,10 +457,7 @@ const ClerkDashboard = () => {
             <CardHeader>
               <CardTitle className="flex items-center">
                 <BarChart3 className="h-5 w-5 mr-2" />
-                Real-time Vote Statistics
-                {location.county !== 'all' && ` for ${location.county}`}
-                {location.constituency !== 'all' && `, ${location.constituency}`}
-                {location.ward !== 'all' && `, ${location.ward}`}
+                Real-time Vote Statistics for {getLocationDisplayName()}
                 <Badge variant={isRealTimeConnected ? "default" : "destructive"} className="ml-2">
                   {isRealTimeConnected ? "LIVE UPDATES" : "OFFLINE"}
                 </Badge>
@@ -484,9 +512,7 @@ const ClerkDashboard = () => {
                           )}
                         </CardTitle>
                         <CardDescription>
-                          {location.ward !== 'all' && `${location.ward}, `}
-                          {location.constituency !== 'all' && `${location.constituency}, `}
-                          {location.county !== 'all' && `${location.county} - `}Real-time Results
+                          {getLocationDisplayName()} - Real-time Results
                         </CardDescription>
                       </div>
                       <div className="text-right">
