@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -135,11 +134,11 @@ const VotingPage = () => {
     }
 
     setIsSubmitting(true);
-    try {
-      console.log('=== STARTING VOTE SUBMISSION ===');
-      console.log('Voter:', voterData);
-      console.log('Selections:', selections);
+    console.log('=== STARTING VOTE SUBMISSION ===');
+    console.log('Voter:', voterData);
+    console.log('Selections:', selections);
 
+    try {
       // First verify voter exists and hasn't voted yet
       const { data: existingVoter, error: voterCheckError } = await supabase
         .from('voters')
@@ -162,42 +161,68 @@ const VotingPage = () => {
         return;
       }
 
-      // Prepare vote records
-      const voteRecords = Object.entries(selections).map(([positionId, candidateId]) => ({
-        position_id: positionId,
-        candidate_id: candidateId,
-        voter_id: voterData.id
-      }));
+      console.log('Voter verified, proceeding with vote submission...');
 
-      console.log('Vote records to insert:', voteRecords);
+      // Prepare vote records with explicit type conversion
+      const voteRecords = Object.entries(selections).map(([positionId, candidateId]) => {
+        const record = {
+          position_id: String(positionId),
+          candidate_id: String(candidateId),
+          voter_id: voterData.id
+        };
+        console.log('Preparing vote record:', record);
+        return record;
+      });
 
-      // Insert all votes in a single transaction
-      const { data: insertedVotes, error: voteError } = await supabase
-        .from('votes')
-        .insert(voteRecords)
-        .select();
+      console.log('All vote records prepared:', voteRecords);
 
-      if (voteError) {
-        console.error('Vote insertion failed:', voteError);
-        throw new Error(`Failed to save votes: ${voteError.message}`);
+      // Insert votes one by one to catch any specific errors
+      const insertedVotes = [];
+      for (const voteRecord of voteRecords) {
+        console.log('Inserting individual vote:', voteRecord);
+        
+        const { data: insertedVote, error: voteError } = await supabase
+          .from('votes')
+          .insert([voteRecord])
+          .select()
+          .single();
+
+        if (voteError) {
+          console.error('Failed to insert vote:', voteRecord, 'Error:', voteError);
+          throw new Error(`Failed to save vote for position ${voteRecord.position_id}: ${voteError.message}`);
+        }
+
+        console.log('Successfully inserted vote:', insertedVote);
+        insertedVotes.push(insertedVote);
       }
 
-      console.log('Votes inserted successfully:', insertedVotes);
+      console.log('All votes inserted successfully:', insertedVotes);
 
-      // Verify all votes were actually saved
+      // Double-check that all votes were actually saved
       const { data: verifyVotes, error: verifyError } = await supabase
         .from('votes')
         .select('*')
         .eq('voter_id', voterData.id);
 
-      if (verifyError || !verifyVotes || verifyVotes.length !== voteRecords.length) {
+      if (verifyError) {
         console.error('Vote verification failed:', verifyError);
-        throw new Error('Votes were not properly saved to database');
+        throw new Error('Failed to verify votes were saved');
       }
 
-      console.log('All votes verified in database:', verifyVotes);
+      console.log('Verification query result:', verifyVotes);
 
-      // Only after votes are confirmed saved, mark voter as voted
+      if (!verifyVotes || verifyVotes.length !== voteRecords.length) {
+        console.error('Vote count mismatch!', {
+          expected: voteRecords.length,
+          actual: verifyVotes?.length || 0,
+          savedVotes: verifyVotes
+        });
+        throw new Error(`Vote verification failed: Expected ${voteRecords.length} votes, found ${verifyVotes?.length || 0}`);
+      }
+
+      console.log('All votes verified successfully!');
+
+      // Only now mark voter as voted
       const { error: voterUpdateError } = await supabase
         .from('voters')
         .update({ 
@@ -208,10 +233,13 @@ const VotingPage = () => {
 
       if (voterUpdateError) {
         console.error('Failed to update voter status:', voterUpdateError);
-        // Votes are saved, so this is not critical
+        // Don't throw here since votes are already saved
+        console.warn('Votes saved but failed to update voter status');
+      } else {
+        console.log('Voter status updated successfully');
       }
 
-      console.log('=== VOTE SUBMISSION COMPLETED ===');
+      console.log('=== VOTE SUBMISSION COMPLETED SUCCESSFULLY ===');
 
       toast({
         title: "Vote Submitted Successfully",
@@ -226,7 +254,8 @@ const VotingPage = () => {
       });
 
     } catch (error: any) {
-      console.error('Vote submission failed:', error);
+      console.error('=== VOTE SUBMISSION FAILED ===');
+      console.error('Error details:', error);
       toast({
         title: "Vote Submission Failed",
         description: error.message || "An error occurred while submitting your vote.",
