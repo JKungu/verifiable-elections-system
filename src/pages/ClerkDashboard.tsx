@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { MapPin, BarChart3, Users, LogOut, Shield, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import kenyaLocations from '@/data/kenyaLocations';
+import { COUNTIES } from '@/data/kenyaLocations';
 import {
   Table,
   TableBody,
@@ -47,18 +47,20 @@ const ClerkDashboard = () => {
   const { toast } = useToast();
 
   // Get counties from Kenya locations data
-  const counties = Object.keys(kenyaLocations);
+  const counties = COUNTIES.map(county => county.name);
   
   // Get constituencies for selected county
-  const getConstituencies = (county: string) => {
-    if (!county || !kenyaLocations[county]) return [];
-    return Object.keys(kenyaLocations[county]);
+  const getConstituencies = (countyName: string) => {
+    const county = COUNTIES.find(c => c.name === countyName);
+    return county ? county.subcounties.map(sc => sc.name) : [];
   };
 
   // Get wards for selected constituency
-  const getWards = (county: string, constituency: string) => {
-    if (!county || !constituency || !kenyaLocations[county]?.[constituency]) return [];
-    return kenyaLocations[county][constituency];
+  const getWards = (countyName: string, constituencyName: string) => {
+    const county = COUNTIES.find(c => c.name === countyName);
+    if (!county) return [];
+    const constituency = county.subcounties.find(sc => sc.name === constituencyName);
+    return constituency ? constituency.wards.map(w => w.name) : [];
   };
 
   useEffect(() => {
