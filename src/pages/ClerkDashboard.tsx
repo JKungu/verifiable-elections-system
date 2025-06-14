@@ -445,6 +445,10 @@ const ClerkDashboard = () => {
     , null);
   };
 
+  const getTotalVotesAcrossAllPositions = () => {
+    return voteData.reduce((total, vote) => total + vote.votes, 0);
+  };
+
   if (!clerkData) {
     return <div>Loading...</div>;
   }
@@ -568,19 +572,19 @@ const ClerkDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Voter Statistics */}
+        {/* Enhanced Statistics Dashboard */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center">
               <BarChart3 className="h-5 w-5 mr-2" />
-              Real-time Voter Statistics - {getLocationDisplayName()}
+              Real-time Election Statistics - {getLocationDisplayName()}
               <Badge variant={isRealTimeConnected ? "default" : "destructive"} className="ml-2">
                 {isRealTimeConnected ? "LIVE UPDATES" : "OFFLINE"}
               </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
               <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
@@ -617,6 +621,18 @@ const ClerkDashboard = () => {
                 </div>
               </div>
               
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                      {getTotalVotesAcrossAllPositions()}
+                    </div>
+                    <div className="text-sm text-yellow-500 dark:text-yellow-300">Total Votes Cast</div>
+                  </div>
+                  <Vote className="h-8 w-8 text-yellow-400" />
+                </div>
+              </div>
+              
               <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
@@ -629,6 +645,43 @@ const ClerkDashboard = () => {
                 </div>
               </div>
             </div>
+
+            {/* Quick Vote Summary */}
+            {voteData.length > 0 && (
+              <div className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold mb-3">Quick Vote Summary - {getLocationDisplayName()}</h3>
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  {electionPositions.map((position) => {
+                    const leadingCandidate = getLeadingCandidate(position.id);
+                    const totalVotes = getTotalVotesForPosition(position.id);
+                    
+                    return (
+                      <div key={position.id} className="bg-white dark:bg-gray-800 p-3 rounded-lg border">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg">{position.icon}</span>
+                          <span className="font-medium text-sm">{position.id}</span>
+                        </div>
+                        {leadingCandidate ? (
+                          <div>
+                            <div className="text-lg font-bold text-green-600">
+                              {leadingCandidate.votes} votes
+                            </div>
+                            <div className="text-xs text-gray-600 dark:text-gray-400">
+                              Leading: {leadingCandidate.candidate_name}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Total: {totalVotes} votes
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500">No votes yet</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -636,7 +689,7 @@ const ClerkDashboard = () => {
         <div className="space-y-6">
           <div className="text-center mb-6">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Election Results by Position - {getLocationDisplayName()}
+              Detailed Election Results by Position - {getLocationDisplayName()}
             </h2>
             <p className="text-gray-600 dark:text-gray-300 mt-2">
               Real-time vote counts for all electoral positions
