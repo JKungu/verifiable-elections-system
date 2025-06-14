@@ -1,6 +1,7 @@
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from "@/contexts/ThemeContext"
+import { AuthProvider } from "@/contexts/AuthContext"
 import { Toaster } from "@/components/ui/toaster"
 import Index from '@/pages/Index';
 import VoteVerificationPage from '@/pages/VoteVerificationPage';
@@ -23,31 +24,33 @@ const queryClient = new QueryClient()
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <Toaster />
-        <BrowserRouter>
-          <div className="min-h-screen bg-background">
-            <Navbar />
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/verify" element={<VoteVerificationPage />} />
-              
-              {/* Voter Routes */}
-              <Route path="/voter-login" element={<VoterLoginPage />} />
-              <Route path="/voter-location" element={<VoterLocationPage />} />
-              <Route path="/voter-candidates" element={<VoterCandidatesPage />} />
-              <Route path="/voting" element={<VotingPage />} />
-              <Route path="/vote-success" element={<VoteSuccessPage />} />
-              
-              {/* Clerk Routes */}
-              <Route path="/clerk-login" element={<ClerkLoginPage />} />
-              <Route path="/clerk-dashboard" element={<ClerkDashboard />} />
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </div>
-        </BrowserRouter>
-      </ThemeProvider>
+      <AuthProvider>
+        <ThemeProvider>
+          <Toaster />
+          <BrowserRouter>
+            <div className="min-h-screen bg-background">
+              <Navbar />
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/verify" element={<VoteVerificationPage />} />
+                
+                {/* Voter Routes */}
+                <Route path="/voter-login" element={<VoterLoginPage />} />
+                <Route path="/voter-location" element={<VoterLocationPage />} />
+                <Route path="/voter-candidates" element={<VoterCandidatesPage />} />
+                <Route path="/voting" element={<VotingPage />} />
+                <Route path="/vote-success" element={<VoteSuccessPage />} />
+                
+                {/* Clerk Routes */}
+                <Route path="/clerk-login" element={<ClerkLoginPage />} />
+                <Route path="/clerk-dashboard" element={<ClerkDashboard />} />
+                
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </div>
+          </BrowserRouter>
+        </ThemeProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
