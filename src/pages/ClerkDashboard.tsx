@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -319,7 +318,6 @@ const ClerkDashboard = () => {
         return;
       }
 
-      const totalRegistered = allVoters?.length || 0;
       const totalVoted = votedVoters?.length || 0;
       const totalRegistered = Math.max(totalVoted * 50, 1000); // Simulate realistic registered voter base
       const turnoutPercentage = totalRegistered > 0 ? (totalVoted / totalRegistered * 100) : 0;
