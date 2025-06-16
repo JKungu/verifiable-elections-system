@@ -149,8 +149,7 @@ const ClerkDashboard = () => {
         .select('*');
 
       // Get location-specific candidates based on current selection
-      const locationIds = getLocationIds();
-      console.log('Location IDs for filtering:', locationIds);
+      console.log('Location selection:', location);
       
       if (location.county === 'all') {
         // Show only presidential candidates when no location is specified
@@ -193,31 +192,6 @@ const ClerkDashboard = () => {
     }
   };
 
-  // Get location IDs for database filtering
-  const getLocationIds = () => {
-    const locationIds: string[] = [];
-    
-    if (location.county !== 'all') {
-      // Add county-level location ID
-      const countyId = location.county.toLowerCase().replace(/\s+/g, '');
-      locationIds.push(countyId);
-      
-      if (location.constituency !== 'all') {
-        // Add constituency-level location ID
-        const constituencyId = location.constituency.toLowerCase().replace(/\s+/g, '');
-        locationIds.push(constituencyId);
-        
-        if (location.ward !== 'all') {
-          // Add ward-level location ID
-          const wardId = location.ward.toLowerCase().replace(/\s+/g, '');
-          locationIds.push(wardId);
-        }
-      }
-    }
-    
-    return locationIds;
-  };
-
   // Set up real-time subscription for votes and voters
   useEffect(() => {
     console.log('Setting up real-time subscriptions...');
@@ -239,6 +213,7 @@ const ClerkDashboard = () => {
             description: `Vote recorded for ${newData?.position_id || 'position'}`,
           });
           loadVoteData();
+          loadVoteTallies(); // Refresh tallies when new vote comes in
         }
       )
       .subscribe((status) => {
@@ -270,6 +245,23 @@ const ClerkDashboard = () => {
       )
       .subscribe();
 
+    const talliesChannel = supabase
+      .channel('tallies-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'vote_tallies'
+        },
+        (payload) => {
+          console.log('Real-time tally update received:', payload);
+          loadVoteTallies(); // Refresh tallies
+          loadVoteData(); // Refresh vote data display
+        }
+      )
+      .subscribe();
+
     if (isRealTimeConnected) {
       toast({
         title: "Real-time Connected",
@@ -281,6 +273,7 @@ const ClerkDashboard = () => {
       console.log('Cleaning up real-time subscriptions');
       supabase.removeChannel(votesChannel);
       supabase.removeChannel(votersChannel);
+      supabase.removeChannel(talliesChannel);
       setIsRealTimeConnected(false);
     };
   }, [toast]);
@@ -309,36 +302,25 @@ const ClerkDashboard = () => {
 
   const loadVoterData = async () => {
     try {
-      console.log('Loading voter data for location:', getLocationDisplayName());
+      console.log('Loading real voter data from database...');
       
-      let query = supabase.from('voters').select('*');
-      
-      const locationIds = getLocationIds();
-      if (locationIds.length > 0) {
-        query = query.in('location_id', locationIds);
-      }
+      // Get actual voter counts from database
+      const { data: allVoters, error: allError } = await supabase
+        .from('voters')
+        .select('*');
 
-      const { data: allVoters, error: allError } = await query;
-      const { data: votedVoters, error: votedError } = await query.eq('has_voted', true);
+      const { data: votedVoters, error: votedError } = await supabase
+        .from('voters')
+        .select('*')
+        .eq('has_voted', true);
 
       if (allError || votedError) {
         console.error('Error loading voter data:', allError || votedError);
         return;
       }
 
-      // Generate realistic voter numbers based on location level
-      let totalRegistered: number;
-      if (location.county === 'all') {
-        totalRegistered = 25000;
-      } else if (location.ward !== 'all') {
-        totalRegistered = 800;
-      } else if (location.constituency !== 'all') {
-        totalRegistered = 3500;
-      } else {
-        totalRegistered = 12000;
-      }
-
-      const totalVoted = votedVoters?.length || Math.floor(totalRegistered * 0.4); // 40% turnout simulation
+      const totalRegistered = allVoters?.length || 0;
+      const totalVoted = votedVoters?.length || 0;
       const turnoutPercentage = totalRegistered > 0 ? (totalVoted / totalRegistered * 100) : 0;
 
       setVoterStats({
@@ -347,7 +329,7 @@ const ClerkDashboard = () => {
         turnoutPercentage
       });
 
-      console.log(`Voter stats for ${getLocationDisplayName()}: ${totalVoted}/${totalRegistered} (${turnoutPercentage.toFixed(1)}%)`);
+      console.log(`Real voter stats: ${totalVoted}/${totalRegistered} voters (${turnoutPercentage.toFixed(1)}%)`);
 
     } catch (error) {
       console.error('Error loading voter data:', error);
@@ -357,7 +339,7 @@ const ClerkDashboard = () => {
   const loadVoteData = async () => {
     setLoading(true);
     try {
-      console.log('=== LOADING VOTE DATA ===');
+      console.log('=== LOADING REAL VOTE DATA FROM DATABASE ===');
       console.log('Loading vote data for location:', getLocationDisplayName());
       console.log('Current candidates:', candidates);
 
@@ -383,13 +365,13 @@ const ClerkDashboard = () => {
         ? location.county.toLowerCase()
         : 'all';
 
-      // Create vote data for each position
+      // Create vote data for each position using REAL database tallies
       Object.entries(candidatesByPosition).forEach(([positionId, positionCandidates]) => {
         const position = positions.find(p => p.id === positionId);
         if (!position) return;
 
         positionCandidates.forEach(candidate => {
-          // Get vote count from tallies or simulate
+          // Get REAL vote count from tallies - no simulation
           let voteCount = 0;
           
           if (positionId === 'president') {
@@ -398,14 +380,14 @@ const ClerkDashboard = () => {
               t.candidate_id === candidate.id && 
               t.location_id === (location.county !== 'all' ? location.county.toLowerCase() : 'nairobi')
             );
-            voteCount = tally?.vote_count || Math.floor(Math.random() * 1000) + 200;
+            voteCount = tally?.vote_count || 0; // Use 0 if no votes recorded
           } else {
             // Use location-specific tallies for other positions
             const tally = voteTallies.find(t => 
               t.candidate_id === candidate.id && 
               t.location_id === currentLocationId
             );
-            voteCount = tally?.vote_count || Math.floor(Math.random() * 800) + 100;
+            voteCount = tally?.vote_count || 0; // Use 0 if no votes recorded
           }
           
           processedData.push({
@@ -419,10 +401,10 @@ const ClerkDashboard = () => {
         });
       });
 
-      console.log('Final processed vote data for location:', processedData);
+      console.log('Final processed vote data (REAL from database):', processedData);
       setVoteData(processedData);
 
-      console.log('=== VOTE DATA LOADING COMPLETED ===');
+      console.log('=== REAL VOTE DATA LOADING COMPLETED ===');
 
     } catch (error) {
       console.error('Error loading vote data:', error);
@@ -438,13 +420,13 @@ const ClerkDashboard = () => {
 
   // Load data when component mounts and when location changes
   useEffect(() => {
-    if (voteTallies.length > 0) {
+    if (voteTallies.length >= 0) { // Allow loading even with 0 tallies
       loadCandidates();
     }
   }, [location, voteTallies]);
 
   useEffect(() => {
-    if (candidates.length > 0) {
+    if (candidates.length >= 0) { // Allow loading even with 0 candidates
       loadVoterData();
       loadVoteData();
     }
@@ -524,7 +506,7 @@ const ClerkDashboard = () => {
             </CardTitle>
             <div className="flex gap-2">
               <Badge variant="outline" className="bg-gray-800 border-gray-600 text-gray-200">
-                Turnout: {totalVotes}
+                Total Votes: {totalVotes}
               </Badge>
               <Badge variant="outline" className="bg-gray-800 border-gray-600 text-gray-200">
                 {sortedVotes.length} Candidates
@@ -553,7 +535,7 @@ const ClerkDashboard = () => {
                     <TableRow key={vote.candidate_id} className={`hover:bg-gray-800 border-b border-gray-700 ${isLeading ? 'bg-green-900/20' : 'bg-gray-900'}`}>
                       <TableCell className="font-medium text-white">
                         <div className="flex items-center gap-2">
-                          {isLeading && <span className="text-lg">🏆</span>}
+                          {isLeading && totalVotes > 0 && <span className="text-lg">🏆</span>}
                           {vote.candidate_name}
                         </div>
                       </TableCell>
@@ -563,17 +545,17 @@ const ClerkDashboard = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        <span className={`font-bold text-white ${isLeading ? 'text-green-400' : ''}`}>
+                        <span className={`font-bold text-white ${isLeading && totalVotes > 0 ? 'text-green-400' : ''}`}>
                           {vote.votes.toLocaleString()}
                         </span>
                       </TableCell>
                       <TableCell className="text-center">
-                        <span className={`font-medium text-white ${isLeading ? 'text-green-400' : ''}`}>
+                        <span className={`font-medium text-white ${isLeading && totalVotes > 0 ? 'text-green-400' : ''}`}>
                           {percentage.toFixed(1)}%
                         </span>
                       </TableCell>
                       <TableCell className="text-center">
-                        {isLeading ? (
+                        {isLeading && totalVotes > 0 ? (
                           <Badge className="bg-green-800 text-green-200 border-green-700 hover:bg-green-700">
                             Leading
                           </Badge>
@@ -815,7 +797,7 @@ const ClerkDashboard = () => {
                       <div className="text-sm font-medium text-gray-200">{positionTitle}</div>
                     </div>
                     <div className="text-xs text-gray-400 mb-1">
-                      Leading: {leader?.candidate_name || 'None'}
+                      Leading: {leader?.candidate_name || 'No votes yet'}
                     </div>
                     <div className="text-lg font-bold text-blue-400">
                       {totalVotes.toLocaleString()} votes
