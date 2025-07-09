@@ -355,25 +355,23 @@ const ClerkDashboard = () => {
   const loadVoteData = async () => {
     setLoading(true);
     try {
-      console.log('=== LOADING REALISTIC VOTE DATA FROM DATABASE ===');
+      console.log('=== LOADING ACTUAL VOTE DATA FROM DATABASE ===');
       console.log('Loading vote data for location:', getLocationDisplayName());
       console.log('Current candidates:', candidates);
 
       const processedData: VoteData[] = [];
       
-      // Get actual number of voters who have voted
-      const { data: votedVoters, error: votersError } = await supabase
-        .from('voters')
-        .select('*')
-        .eq('has_voted', true);
+      // Get actual votes from the database
+      const { data: actualVotes, error: votesError } = await supabase
+        .from('votes')
+        .select('*');
 
-      if (votersError) {
-        console.error('Error loading voted voters:', votersError);
+      if (votesError) {
+        console.error('Error loading votes:', votesError);
         return;
       }
 
-      const totalVotedVoters = votedVoters?.length || 0;
-      console.log('Total voters who have voted:', totalVotedVoters);
+      console.log('Actual votes from database:', actualVotes);
 
       // Group candidates by position
       const candidatesByPosition = candidates.reduce((acc, candidate) => {
@@ -386,48 +384,32 @@ const ClerkDashboard = () => {
 
       console.log('Candidates by position:', candidatesByPosition);
 
-      // Get current location for vote tallies
-      const currentLocationId = location.ward !== 'all' 
-        ? location.ward.toLowerCase().replace(/\s+/g, '')
-        : location.constituency !== 'all'
-        ? location.constituency.toLowerCase().replace(/\s+/g, '')
-        : location.county !== 'all'
-        ? location.county.toLowerCase()
-        : 'all';
-
-      // Create realistic vote data for each position based on actual voters
+      // Process actual votes for each position
       Object.entries(candidatesByPosition).forEach(([positionId, positionCandidates]) => {
         const position = positions.find(p => p.id === positionId);
         if (!position) return;
 
-        // Distribute votes among candidates realistically (based on actual voters)
-        const votesForPosition = Math.min(totalVotedVoters, totalVotedVoters); // Each voter votes once per position
-        
-        positionCandidates.forEach((candidate, index) => {
-          let voteCount = 0;
-          
-          if (votesForPosition > 0) {
-            // Distribute votes realistically - leading candidate gets more, others get proportionally less
-            const baseVotes = Math.floor(votesForPosition / positionCandidates.length);
-            const bonus = Math.max(0, Math.floor((votesForPosition % positionCandidates.length) * (0.8 - index * 0.2)));
-            voteCount = baseVotes + (index === 0 ? bonus : Math.max(0, bonus - index));
-          }
+        positionCandidates.forEach((candidate) => {
+          // Count actual votes for this candidate
+          const candidateVotes = actualVotes?.filter(vote => 
+            vote.candidate_id === candidate.id && vote.position_id === positionId
+          ) || [];
           
           processedData.push({
             position: position.title,
             candidate_id: candidate.id,
             candidate_name: candidate.name,
             party: candidate.party,
-            votes: voteCount,
+            votes: candidateVotes.length,
             location: getLocationDisplayName()
           });
         });
       });
 
-      console.log('Final processed vote data (REALISTIC based on actual voters):', processedData);
+      console.log('Final processed vote data (ACTUAL from database):', processedData);
       setVoteData(processedData);
 
-      console.log('=== REALISTIC VOTE DATA LOADING COMPLETED ===');
+      console.log('=== ACTUAL VOTE DATA LOADING COMPLETED ===');
 
     } catch (error) {
       console.error('Error loading vote data:', error);
