@@ -159,16 +159,33 @@ const ClerkDashboard = () => {
         
         if (location.county !== 'all') {
           // Add county-level positions (governor, women_rep)
-          locationFilter += `,and(position_id.in.(governor,women_rep),location_id.eq.${location.county.toLowerCase()})`;
+          const countyId = location.county.toLowerCase().replace(/\s+/g, '');
+          locationFilter += `,and(position_id.in.(governor,women_rep),location_id.eq.${countyId})`;
           
           if (location.constituency !== 'all') {
             // Add constituency-level positions (mp)
-            const constituencyId = location.constituency.toLowerCase().replace(/\s+/g, '');
+            const constituencyMap: Record<string, string> = {
+              'westlands': 'westlands',
+              'kiambu town': 'kiambutown',
+              'thika town': 'thikatown',
+              'machakos town': 'machakostwon',
+              'nakuru town east': 'nakurutowneast',
+              'kisumu east': 'kisumueast',
+              'mvita': 'mvita'
+            };
+            const constituencyId = constituencyMap[location.constituency.toLowerCase()] || location.constituency.toLowerCase().replace(/\s+/g, '');
             locationFilter += `,and(position_id.eq.mp,location_id.eq.${constituencyId})`;
             
             if (location.ward !== 'all') {
               // Add ward-level positions (mca)
-              const wardId = location.ward.toLowerCase().replace(/\s+/g, '');
+              const wardMap: Record<string, string> = {
+                'parklands': 'parklands',
+                'township': 'township',
+                'majengo': 'majengo',
+                'biashara': 'biashara',
+                'kolwa central': 'kolwacentral'
+              };
+              const wardId = wardMap[location.ward.toLowerCase()] || location.ward.toLowerCase().replace(/\s+/g, '');
               locationFilter += `,and(position_id.eq.mca,location_id.eq.${wardId})`;
             }
           }
