@@ -53,9 +53,6 @@ const VotingPage = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Clear existing voter data first
-    clearExistingVoterData();
-    
     // Get voter data from navigation state
     const voter = location.state?.voter;
     if (!voter) {
@@ -71,35 +68,6 @@ const VotingPage = () => {
     loadCandidatesForVoter(voter);
   }, [location.state, navigate, toast]);
 
-  const clearExistingVoterData = async () => {
-    try {
-      console.log('Clearing existing voter and vote data...');
-      
-      // Clear all votes first (due to foreign key constraints)
-      const { error: votesError } = await supabase
-        .from('votes')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
-
-      if (votesError) {
-        console.error('Error clearing votes:', votesError);
-      }
-
-      // Clear all voters
-      const { error: votersError } = await supabase
-        .from('voters')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
-
-      if (votersError) {
-        console.error('Error clearing voters:', votersError);
-      }
-
-      console.log('Successfully cleared existing voter data');
-    } catch (error) {
-      console.error('Error during data cleanup:', error);
-    }
-  };
 
   const loadCandidatesForVoter = async (voter: any) => {
     try {
