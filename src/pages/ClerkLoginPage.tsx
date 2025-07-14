@@ -50,7 +50,7 @@ const ClerkLoginPage = () => {
         .select('*')
         .eq('national_id', formData.idNumber)
         .eq('user_role', 'election_authority')
-        .single();
+        .maybeSingle();
 
       if (fetchError && fetchError.code !== 'PGRST116') {
         console.error('Error checking clerk:', fetchError);
