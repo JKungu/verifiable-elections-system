@@ -355,23 +355,42 @@ const ClerkDashboard = () => {
   const loadVoteData = async () => {
     setLoading(true);
     try {
-      console.log('=== LOADING ACTUAL VOTE DATA FROM DATABASE ===');
+      console.log('=== LOADING VOTE DATA FROM VOTE TALLIES ===');
       console.log('Loading vote data for location:', getLocationDisplayName());
       console.log('Current candidates:', candidates);
 
       const processedData: VoteData[] = [];
       
-      // Get actual votes from the database
-      const { data: actualVotes, error: votesError } = await supabase
-        .from('votes')
-        .select('*');
+      // Determine location filter based on current selection
+      let locationFilter = '';
+      if (location.county !== 'all') {
+        if (location.ward !== 'all') {
+          locationFilter = location.ward.toLowerCase().replace(/\s+/g, '');
+        } else if (location.constituency !== 'all') {
+          locationFilter = location.constituency.toLowerCase().replace(/\s+/g, '');
+        } else {
+          locationFilter = location.county.toLowerCase().replace(/\s+/g, '');
+        }
+      }
 
-      if (votesError) {
-        console.error('Error loading votes:', votesError);
+      console.log('Location filter:', locationFilter);
+
+      // Get vote tallies from the database
+      let query = supabase.from('vote_tallies').select('*');
+      
+      // Apply location filter if not viewing all
+      if (locationFilter) {
+        query = query.eq('location_id', locationFilter);
+      }
+
+      const { data: voteTalliesData, error: talliesError } = await query;
+
+      if (talliesError) {
+        console.error('Error loading vote tallies:', talliesError);
         return;
       }
 
-      console.log('Actual votes from database:', actualVotes);
+      console.log('Vote tallies from database:', voteTalliesData);
 
       // Group candidates by position
       const candidatesByPosition = candidates.reduce((acc, candidate) => {
@@ -384,32 +403,34 @@ const ClerkDashboard = () => {
 
       console.log('Candidates by position:', candidatesByPosition);
 
-      // Process actual votes for each position
+      // Process vote tallies for each position
       Object.entries(candidatesByPosition).forEach(([positionId, positionCandidates]) => {
         const position = positions.find(p => p.id === positionId);
         if (!position) return;
 
         positionCandidates.forEach((candidate) => {
-          // Count actual votes for this candidate
-          const candidateVotes = actualVotes?.filter(vote => 
-            vote.candidate_id === candidate.id && vote.position_id === positionId
-          ) || [];
+          // Find vote tally for this candidate
+          const candidateTally = voteTalliesData?.find(tally => 
+            tally.candidate_id === candidate.id
+          );
+          
+          const voteCount = candidateTally?.vote_count || 0;
           
           processedData.push({
             position: position.title,
             candidate_id: candidate.id,
             candidate_name: candidate.name,
             party: candidate.party,
-            votes: candidateVotes.length,
+            votes: voteCount,
             location: getLocationDisplayName()
           });
         });
       });
 
-      console.log('Final processed vote data (ACTUAL from database):', processedData);
+      console.log('Final processed vote data (from vote tallies):', processedData);
       setVoteData(processedData);
 
-      console.log('=== ACTUAL VOTE DATA LOADING COMPLETED ===');
+      console.log('=== VOTE DATA LOADING COMPLETED ===');
 
     } catch (error) {
       console.error('Error loading vote data:', error);
