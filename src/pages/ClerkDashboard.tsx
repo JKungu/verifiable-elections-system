@@ -358,10 +358,23 @@ const ClerkDashboard = () => {
       console.log('=== LOADING VOTE DATA FROM VOTE TALLIES ===');
       console.log('Loading vote data for location:', getLocationDisplayName());
       console.log('Current candidates:', candidates);
+      console.log('Current location filter:', location);
 
       const processedData: VoteData[] = [];
       
-      // Determine location filter based on current selection
+      // Get ALL vote tallies first, then filter in JavaScript for better debugging
+      const { data: allVoteTallies, error: talliesError } = await supabase
+        .from('vote_tallies')
+        .select('*');
+
+      if (talliesError) {
+        console.error('Error loading vote tallies:', talliesError);
+        return;
+      }
+
+      console.log('ALL vote tallies from database:', allVoteTallies);
+
+      // Determine location filter
       let locationFilter = '';
       if (location.county !== 'all') {
         if (location.ward !== 'all') {
@@ -373,24 +386,17 @@ const ClerkDashboard = () => {
         }
       }
 
-      console.log('Location filter:', locationFilter);
+      console.log('Location filter applied:', locationFilter);
 
-      // Get vote tallies from the database
-      let query = supabase.from('vote_tallies').select('*');
-      
-      // Apply location filter if not viewing all
+      // Filter vote tallies by location if needed
+      let filteredTallies = allVoteTallies || [];
       if (locationFilter) {
-        query = query.eq('location_id', locationFilter);
+        filteredTallies = allVoteTallies?.filter(tally => 
+          tally.location_id === locationFilter
+        ) || [];
       }
 
-      const { data: voteTalliesData, error: talliesError } = await query;
-
-      if (talliesError) {
-        console.error('Error loading vote tallies:', talliesError);
-        return;
-      }
-
-      console.log('Vote tallies from database:', voteTalliesData);
+      console.log('Filtered vote tallies:', filteredTallies);
 
       // Group candidates by position
       const candidatesByPosition = candidates.reduce((acc, candidate) => {
@@ -406,15 +412,20 @@ const ClerkDashboard = () => {
       // Process vote tallies for each position
       Object.entries(candidatesByPosition).forEach(([positionId, positionCandidates]) => {
         const position = positions.find(p => p.id === positionId);
-        if (!position) return;
+        if (!position) {
+          console.log('No position found for ID:', positionId);
+          return;
+        }
 
         positionCandidates.forEach((candidate) => {
-          // Find vote tally for this candidate
-          const candidateTally = voteTalliesData?.find(tally => 
+          // Find vote tally for this candidate  
+          const candidateTally = filteredTallies.find(tally => 
             tally.candidate_id === candidate.id
           );
           
           const voteCount = candidateTally?.vote_count || 0;
+          
+          console.log(`Candidate ${candidate.name} (${candidate.id}): ${voteCount} votes`, candidateTally);
           
           processedData.push({
             position: position.title,
