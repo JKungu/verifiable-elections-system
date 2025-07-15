@@ -621,6 +621,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      recalculate_vote_tallies: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       audit_action:
