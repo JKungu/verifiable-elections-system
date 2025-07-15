@@ -374,26 +374,41 @@ const ClerkDashboard = () => {
 
       console.log('ALL vote tallies from database:', allVoteTallies);
 
-      // Determine location filter
+      // Determine location filter based on actual database location structure
       let locationFilter = '';
       if (location.county !== 'all') {
         if (location.ward !== 'all') {
-          locationFilter = location.ward.toLowerCase().replace(/\s+/g, '');
+          // For ward level, check for specific ward patterns in the database
+          locationFilter = location.ward.toLowerCase();
         } else if (location.constituency !== 'all') {
-          locationFilter = location.constituency.toLowerCase().replace(/\s+/g, '');
+          locationFilter = location.constituency.toLowerCase();
         } else {
-          locationFilter = location.county.toLowerCase().replace(/\s+/g, '');
+          locationFilter = location.county.toLowerCase();
         }
       }
 
       console.log('Location filter applied:', locationFilter);
+      console.log('Available location_ids in vote tallies:', [...new Set(allVoteTallies?.map(t => t.location_id))]);
 
       // Filter vote tallies by location if needed
       let filteredTallies = allVoteTallies || [];
       if (locationFilter) {
-        filteredTallies = allVoteTallies?.filter(tally => 
-          tally.location_id === locationFilter
-        ) || [];
+        // Use more flexible matching to handle various location formats
+        filteredTallies = allVoteTallies?.filter(tally => {
+          const tallyLocation = tally.location_id?.toLowerCase() || '';
+          
+          // Try different matching strategies:
+          // 1. Exact match
+          if (tallyLocation === locationFilter) return true;
+          
+          // 2. Contains match (for cases like ward-0547 containing part of the location)
+          if (tallyLocation.includes(locationFilter)) return true;
+          
+          // 3. Reverse contains (for cases where filter contains part of tally location)
+          if (locationFilter.includes(tallyLocation)) return true;
+          
+          return false;
+        }) || [];
       }
 
       console.log('Filtered vote tallies:', filteredTallies);
