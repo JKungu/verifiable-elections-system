@@ -375,37 +375,25 @@ const ClerkDashboard = () => {
       console.log('ALL vote tallies from database:', allVoteTallies);
 
       // Determine location filter based on actual database location structure
-      let locationFilter = '';
-      if (location.county !== 'all') {
-        if (location.ward !== 'all') {
-          // For ward level, check for specific ward patterns in the database
-          locationFilter = location.ward.toLowerCase();
-        } else if (location.constituency !== 'all') {
-          locationFilter = location.constituency.toLowerCase();
-        } else {
-          locationFilter = location.county.toLowerCase();
-        }
-      }
-
-      console.log('Location filter applied:', locationFilter);
-      console.log('Available location_ids in vote tallies:', [...new Set(allVoteTallies?.map(t => t.location_id))]);
-
-      // Filter vote tallies by location if needed
       let filteredTallies = allVoteTallies || [];
-      if (locationFilter) {
-        // Use more flexible matching to handle various location formats
+      
+      if (location.county !== 'all') {
+        console.log('Filtering by location:', location);
+        console.log('Available location_ids in vote tallies:', [...new Set(allVoteTallies?.map(t => t.location_id))]);
+        
+        // Get the county for filtering
+        const countyFilter = location.county.toLowerCase();
+        
+        // Filter vote tallies by county (and more specific if available)
         filteredTallies = allVoteTallies?.filter(tally => {
           const tallyLocation = tally.location_id?.toLowerCase() || '';
           
-          // Try different matching strategies:
-          // 1. Exact match
-          if (tallyLocation === locationFilter) return true;
+          // Include tallies that match the county or contain the county name
+          // For Kiambu, include both "kiambu" and "ward-0547" (which is within Kiambu)
+          if (tallyLocation.includes(countyFilter)) return true;
           
-          // 2. Contains match (for cases like ward-0547 containing part of the location)
-          if (tallyLocation.includes(locationFilter)) return true;
-          
-          // 3. Reverse contains (for cases where filter contains part of tally location)
-          if (locationFilter.includes(tallyLocation)) return true;
+          // Special handling for wards within the county
+          if (countyFilter === 'kiambu' && tallyLocation.startsWith('ward-')) return true;
           
           return false;
         }) || [];
