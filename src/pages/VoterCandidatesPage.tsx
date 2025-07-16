@@ -31,6 +31,40 @@ interface Position {
   level: string;
 }
 
+// Helper functions to map database position_id to component position id
+const getPositionIdFromDb = (dbPositionId: string): string => {
+  const mapping: Record<string, string> = {
+    'president': '1',
+    'governor': '2', 
+    'women_rep': '3',
+    'mp': '4',
+    'mca': '5'
+  };
+  return mapping[dbPositionId] || dbPositionId;
+};
+
+const getPositionName = (dbPositionId: string): string => {
+  const mapping: Record<string, string> = {
+    'president': 'President',
+    'governor': 'Governor',
+    'women_rep': 'Women Representative', 
+    'mp': 'Member of Parliament',
+    'mca': 'Member of County Assembly'
+  };
+  return mapping[dbPositionId] || dbPositionId;
+};
+
+const getPositionLevel = (dbPositionId: string): string => {
+  const mapping: Record<string, string> = {
+    'president': 'country',
+    'governor': 'county',
+    'women_rep': 'county',
+    'mp': 'constituency', 
+    'mca': 'ward'
+  };
+  return mapping[dbPositionId] || 'unknown';
+};
+
 const VoterCandidatesPage = () => {
   const [selectedCandidates, setSelectedCandidates] = useState<{ [positionId: string]: string }>({});
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -65,167 +99,71 @@ const VoterCandidatesPage = () => {
         
         setPositions(hardcodedPositions);
 
-        // Generate location-specific candidates
-        const locationSpecificCandidates: Candidate[] = [
-          // Presidential candidates (same for all locations)
-          {
-            id: '1',
-            candidate_id: 'PRES001',
-            full_name: 'John Kamau Mwangi',
-            name: 'John Kamau',
-            party: 'Democratic Alliance',
-            image_url: '/placeholder.svg',
-            position: { id: '1', name: 'President', level: 'country' }
+        // Load candidates from database instead of hardcoded data
+        const { data: candidatesData, error: candidatesError } = await supabase
+          .from('election_candidates')
+          .select(`
+            id,
+            name,
+            party,
+            position_id,
+            location_id,
+            location_level,
+            image_url
+          `)
+          .order('position_id', { ascending: true });
+
+        if (candidatesError) {
+          console.error('Error loading candidates:', candidatesError);
+          throw candidatesError;
+        }
+
+        // Transform database candidates to match component interface
+        const transformedCandidates: Candidate[] = candidatesData?.map(candidate => ({
+          id: candidate.id,
+          candidate_id: candidate.id,
+          full_name: candidate.name,
+          name: candidate.name.split(' ')[0] + ' ' + (candidate.name.split(' ')[1] || ''),
+          party: candidate.party,
+          image_url: candidate.image_url || '/placeholder.svg',
+          position: {
+            id: getPositionIdFromDb(candidate.position_id),
+            name: getPositionName(candidate.position_id),
+            level: candidate.location_level || getPositionLevel(candidate.position_id)
           },
-          {
-            id: '2',
-            candidate_id: 'PRES002',
-            full_name: 'Mary Wanjiku Njeri',
-            name: 'Mary Wanjiku',
-            party: 'Unity Party',
-            image_url: '/placeholder.svg',
-            position: { id: '1', name: 'President', level: 'country' }
-          },
-          {
-            id: '3',
-            candidate_id: 'PRES003',
-            full_name: 'David Otieno Ochieng',
-            name: 'David Otieno',
-            party: 'Progressive Movement',
-            image_url: '/placeholder.svg',
-            position: { id: '1', name: 'President', level: 'country' }
-          },
+          location_id: candidate.location_id
+        })) || [];
+
+        // Filter candidates based on voter's location
+        const filteredCandidates = transformedCandidates.filter(candidate => {
+          // Always include presidential candidates
+          if (candidate.position.id === '1') return true;
           
-          // Governor candidates (specific to county)
-          {
-            id: `gov-${location.county.id}-1`,
-            candidate_id: `GOV${location.county.code}001`,
-            full_name: `Peter Mwangi Kariuki - ${location.county.name}`,
-            name: 'Peter Mwangi',
-            party: 'County First',
-            image_url: '/placeholder.svg',
-            position: { id: '2', name: 'Governor', level: 'county' },
-            location_id: location.county.id
-          },
-          {
-            id: `gov-${location.county.id}-2`,
-            candidate_id: `GOV${location.county.code}002`,
-            full_name: `Grace Akinyi Omondi - ${location.county.name}`,
-            name: 'Grace Akinyi',
-            party: 'Development Party',
-            image_url: '/placeholder.svg',
-            position: { id: '2', name: 'Governor', level: 'county' },
-            location_id: location.county.id
-          },
-          {
-            id: `gov-${location.county.id}-3`,
-            candidate_id: `GOV${location.county.code}003`,
-            full_name: `Samuel Kiprotich Ruto - ${location.county.name}`,
-            name: 'Samuel Kiprotich',
-            party: 'Reform Alliance',
-            image_url: '/placeholder.svg',
-            position: { id: '2', name: 'Governor', level: 'county' },
-            location_id: location.county.id
-          },
-
-          // Women Representative candidates (specific to county)
-          {
-            id: `wr-${location.county.id}-1`,
-            candidate_id: `WR${location.county.code}001`,
-            full_name: `Susan Njeri Kimani - ${location.county.name}`,
-            name: 'Susan Njeri',
-            party: 'Women First',
-            image_url: '/placeholder.svg',
-            position: { id: '3', name: 'Women Representative', level: 'county' },
-            location_id: location.county.id
-          },
-          {
-            id: `wr-${location.county.id}-2`,
-            candidate_id: `WR${location.county.code}002`,
-            full_name: `Faith Wambui Gathua - ${location.county.name}`,
-            name: 'Faith Wambui',
-            party: 'Gender Equality',
-            image_url: '/placeholder.svg',
-            position: { id: '3', name: 'Women Representative', level: 'county' },
-            location_id: location.county.id
-          },
-          {
-            id: `wr-${location.county.id}-3`,
-            candidate_id: `WR${location.county.code}003`,
-            full_name: `Catherine Wairimu Gichuru - ${location.county.name}`,
-            name: 'Catherine Wairimu',
-            party: 'Community Development',
-            image_url: '/placeholder.svg',
-            position: { id: '3', name: 'Women Representative', level: 'county' },
-            location_id: location.county.id
-          },
-
-          // MP candidates (specific to subcounty/constituency)
-          {
-            id: `mp-${location.subcounty.id}-1`,
-            candidate_id: `MP${location.subcounty.id.slice(-3)}001`,
-            full_name: `James Kiprotich Ruto - ${location.subcounty.name}`,
-            name: 'James Kiprotich',
-            party: 'Reform Alliance',
-            image_url: '/placeholder.svg',
-            position: { id: '4', name: 'Member of Parliament', level: 'constituency' },
-            location_id: location.subcounty.id
-          },
-          {
-            id: `mp-${location.subcounty.id}-2`,
-            candidate_id: `MP${location.subcounty.id.slice(-3)}002`,
-            full_name: `Robert Macharia Mugo - ${location.subcounty.name}`,
-            name: 'Robert Macharia',
-            party: 'Grassroots Party',
-            image_url: '/placeholder.svg',
-            position: { id: '4', name: 'Member of Parliament', level: 'constituency' },
-            location_id: location.subcounty.id
-          },
-          {
-            id: `mp-${location.subcounty.id}-3`,
-            candidate_id: `MP${location.subcounty.id.slice(-3)}003`,
-            full_name: `Alice Nyambura Kihara - ${location.subcounty.name}`,
-            name: 'Alice Nyambura',
-            party: 'Progressive Movement',
-            image_url: '/placeholder.svg',
-            position: { id: '4', name: 'Member of Parliament', level: 'constituency' },
-            location_id: location.subcounty.id
-          },
-
-          // MCA candidates (specific to ward)
-          {
-            id: `mca-${location.ward.id}-1`,
-            candidate_id: `MCA${location.ward.id.slice(-3)}001`,
-            full_name: `Francis Mutua Kioko - ${location.ward.name} Ward`,
-            name: 'Francis Mutua',
-            party: 'Local Development',
-            image_url: '/placeholder.svg',
-            position: { id: '5', name: 'Member of County Assembly', level: 'ward' },
-            location_id: location.ward.id
-          },
-          {
-            id: `mca-${location.ward.id}-2`,
-            candidate_id: `MCA${location.ward.id.slice(-3)}002`,
-            full_name: `Catherine Wairimu Gichuru - ${location.ward.name} Ward`,
-            name: 'Catherine Wairimu',
-            party: 'Community First',
-            image_url: '/placeholder.svg',
-            position: { id: '5', name: 'Member of County Assembly', level: 'ward' },
-            location_id: location.ward.id
-          },
-          {
-            id: `mca-${location.ward.id}-3`,
-            candidate_id: `MCA${location.ward.id.slice(-3)}003`,
-            full_name: `Paul Ochieng Otieno - ${location.ward.name} Ward`,
-            name: 'Paul Ochieng',
-            party: 'Unity Party',
-            image_url: '/placeholder.svg',
-            position: { id: '5', name: 'Member of County Assembly', level: 'ward' },
-            location_id: location.ward.id
+          // County level positions (governor, women_rep)
+          if (candidate.position.id === '2' || candidate.position.id === '3') {
+            return candidate.location_id === location.county.name.toLowerCase();
           }
-        ];
+          
+          // Constituency level positions (mp)
+          if (candidate.position.id === '4') {
+            // For Juja constituency, match with "kiambutown" or similar
+            const constituency = location.subcounty.name.toLowerCase();
+            return candidate.location_id === constituency || 
+                   candidate.location_id === constituency.replace(' ', '') ||
+                   candidate.location_id === 'kiambutown'; // Specific mapping for Juja->KiambuTown
+          }
+          
+          // Ward level positions (mca)
+          if (candidate.position.id === '5') {
+            const ward = location.ward.name.toLowerCase();
+            return candidate.location_id === ward || 
+                   candidate.location_id === ward.replace(' ', '');
+          }
+          
+          return false;
+        });
 
-        setCandidates(locationSpecificCandidates);
+        setCandidates(filteredCandidates);
       } catch (error: any) {
         console.error('Error loading candidates:', error);
         toast({
