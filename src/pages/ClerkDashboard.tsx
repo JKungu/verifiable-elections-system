@@ -421,14 +421,24 @@ const ClerkDashboard = () => {
         }
 
         positionCandidates.forEach((candidate) => {
-          // Find vote tally for this candidate  
-          const candidateTally = filteredTallies.find(tally => 
+          // For national positions like President, sum votes from all locations
+          // For local positions, use filtered tallies based on location
+          let relevantTallies = filteredTallies;
+          
+          // If this is a national position (president) and we're filtering by location,
+          // we should still show all votes for presidential candidates
+          if (position.level === 'national' && location.county !== 'all') {
+            relevantTallies = allVoteTallies || [];
+          }
+          
+          // Find ALL vote tallies for this candidate and sum them up
+          const candidateTallies = relevantTallies.filter(tally => 
             tally.candidate_id === candidate.id
           );
           
-          const voteCount = candidateTally?.vote_count || 0;
+          const voteCount = candidateTallies.reduce((sum, tally) => sum + (tally.vote_count || 0), 0);
           
-          console.log(`Candidate ${candidate.name} (${candidate.id}): ${voteCount} votes`, candidateTally);
+          console.log(`Candidate ${candidate.name} (${candidate.id}): ${voteCount} votes from ${candidateTallies.length} locations`, candidateTallies);
           
           processedData.push({
             position: position.title,
