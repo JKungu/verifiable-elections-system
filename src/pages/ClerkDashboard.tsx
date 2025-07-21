@@ -147,68 +147,42 @@ const ClerkDashboard = () => {
         .from('election_candidates')
         .select('*');
 
-      // Always show ALL candidate positions for any location
+      // Filter candidates based on specific location level selected
       console.log('Location selection:', location);
       
       if (location.county === 'all') {
-        // Show all candidates for all positions when no specific location is selected
-        // This includes national positions and all location-specific positions
-        query = query.order('position_id');
-      } else {
-        // Show ALL positions relevant to the selected location:
-        // 1. Presidential candidates (always shown nationally)
-        // 2. Governor and Women Rep for the selected county 
-        // 3. MP for constituencies within the county
-        // 4. MCA for wards within the county
-        
+        // Show only presidential candidates when no location is specified
+        query = query.eq('position_id', 'president');
+      } else if (location.constituency === 'all') {
+        // County level selected: show governor and women rep for this county only
         const countyId = location.county.toLowerCase().replace(/\s+/g, '');
-        
-        let locationFilter = `position_id.eq.president`;
-        
-        // Add county-level positions (governor, women_rep) for the selected county
-        locationFilter += `,and(position_id.in.(governor,women_rep),location_id.eq.${countyId})`;
-        
-        // Add constituency-level positions (mp) for ALL constituencies in the county
-        const constituencyIds = getConstituencies(location.county).map(constituency => {
-          const constituencyMap: Record<string, string> = {
-            'westlands': 'westlands',
-            'kiambu town': 'kiambutown', 
-            'thika town': 'thikatown',
-            'juja': 'juja',
-            'machakos town': 'machakostwon',
-            'nakuru town east': 'nakurutowneast',
-            'kisumu east': 'kisumueast',
-            'mvita': 'mvita'
-          };
-          return constituencyMap[constituency.toLowerCase()] || constituency.toLowerCase().replace(/\s+/g, '');
-        });
-        
-        if (constituencyIds.length > 0) {
-          locationFilter += `,and(position_id.eq.mp,location_id.in.(${constituencyIds.join(',')}))`;
-        }
-        
-        // Add ward-level positions (mca) for ALL wards in the county
-        const allWards = getConstituencies(location.county).flatMap(constituency => 
-          getWards(location.county, constituency)
-        );
-        
-        const wardIds = allWards.map(ward => {
-          const wardMap: Record<string, string> = {
-            'parklands': 'parklands',
-            'township': 'township',
-            'majengo': 'majengo',
-            'biashara': 'biashara',
-            'kolwa central': 'kolwacentral',
-            'murera': 'ward-0547' // Map Murera to its database ID
-          };
-          return wardMap[ward.toLowerCase()] || ward.toLowerCase().replace(/\s+/g, '');
-        });
-        
-        if (wardIds.length > 0) {
-          locationFilter += `,and(position_id.eq.mca,location_id.in.(${wardIds.join(',')}))`;
-        }
-        
-        query = query.or(locationFilter);
+        query = query.in('position_id', ['governor', 'women_rep']).eq('location_id', countyId);
+      } else if (location.ward === 'all') {
+        // Constituency level selected: show MP candidates for this constituency only
+        const constituencyMap: Record<string, string> = {
+          'westlands': 'westlands',
+          'kiambu town': 'kiambutown',
+          'thika town': 'thikatown',
+          'juja': 'juja',
+          'machakos town': 'machakostwon',
+          'nakuru town east': 'nakurutowneast',
+          'kisumu east': 'kisumueast',
+          'mvita': 'mvita'
+        };
+        const constituencyId = constituencyMap[location.constituency.toLowerCase()] || location.constituency.toLowerCase().replace(/\s+/g, '');
+        query = query.eq('position_id', 'mp').eq('location_id', constituencyId);
+      } else {
+        // Ward level selected: show MCA candidates for this ward only
+        const wardMap: Record<string, string> = {
+          'parklands': 'parklands',
+          'township': 'township',
+          'majengo': 'majengo',
+          'biashara': 'biashara',
+          'kolwa central': 'kolwacentral',
+          'murera': 'ward-0547' // Map Murera to its database ID
+        };
+        const wardId = wardMap[location.ward.toLowerCase()] || location.ward.toLowerCase().replace(/\s+/g, '');
+        query = query.eq('position_id', 'mca').eq('location_id', wardId);
       }
 
       const { data: candidatesData, error } = await query;
