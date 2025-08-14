@@ -141,71 +141,20 @@ const ClerkDashboard = () => {
 
   const loadCandidates = async () => {
     try {
-      console.log('Loading candidates for location:', getLocationDisplayName());
+      console.log('Loading all candidates for consistency with voter page');
       
-      let query = supabase
+      // Load ALL candidates from database to match voter experience
+      const { data: candidatesData, error } = await supabase
         .from('election_candidates')
-        .select('*');
-
-      // Hierarchical candidate filtering based on location selection
-      console.log('Location selection:', location);
-      
-      if (location.county === 'all') {
-        // Show only presidential candidates when no location is specified
-        query = query.eq('position_id', 'president');
-      } else if (location.constituency === 'all') {
-        // County level selected: show presidential + governor and women rep for this county
-        const countyId = location.county.toLowerCase().replace(/\s+/g, '');
-        query = query.or(`position_id.eq.president,and(position_id.in.(governor,women_rep),location_id.eq.${countyId})`);
-      } else if (location.ward === 'all') {
-        // Constituency level selected: show presidential + county candidates + MP for this constituency
-        const countyId = location.county.toLowerCase().replace(/\s+/g, '');
-        const constituencyMap: Record<string, string> = {
-          'westlands': 'westlands',
-          'kiambu town': 'kiambutown',
-          'thika town': 'thikatown',
-          'juja': 'juja',
-          'machakos town': 'machakostwon',
-          'nakuru town east': 'nakurutowneast',
-          'kisumu east': 'kisumueast',
-          'mvita': 'mvita'
-        };
-        const constituencyId = constituencyMap[location.constituency.toLowerCase()] || location.constituency.toLowerCase().replace(/\s+/g, '');
-        query = query.or(`position_id.eq.president,and(position_id.in.(governor,women_rep),location_id.eq.${countyId}),and(position_id.eq.mp,location_id.eq.${constituencyId})`);
-      } else {
-        // Ward level selected: show presidential + county candidates + constituency MP + ward MCA
-        const countyId = location.county.toLowerCase().replace(/\s+/g, '');
-        const constituencyMap: Record<string, string> = {
-          'westlands': 'westlands',
-          'kiambu town': 'kiambutown',
-          'thika town': 'thikatown',
-          'juja': 'juja',
-          'machakos town': 'machakostwon',
-          'nakuru town east': 'nakurutowneast',
-          'kisumu east': 'kisumueast',
-          'mvita': 'mvita'
-        };
-        const constituencyId = constituencyMap[location.constituency.toLowerCase()] || location.constituency.toLowerCase().replace(/\s+/g, '');
-        const wardMap: Record<string, string> = {
-          'parklands': 'parklands',
-          'township': 'township',
-          'majengo': 'majengo',
-          'biashara': 'biashara',
-          'kolwa central': 'kolwacentral',
-          'murera': 'ward-0547' // Map Murera to its database ID
-        };
-        const wardId = wardMap[location.ward.toLowerCase()] || location.ward.toLowerCase().replace(/\s+/g, '');
-        query = query.or(`position_id.eq.president,and(position_id.in.(governor,women_rep),location_id.eq.${countyId}),and(position_id.eq.mp,location_id.eq.${constituencyId}),and(position_id.eq.mca,location_id.eq.${wardId})`);
-      }
-
-      const { data: candidatesData, error } = await query;
+        .select('*')
+        .order('position_id', { ascending: true });
 
       if (error) {
         console.error('Error loading candidates:', error);
         return;
       }
 
-      console.log('Loaded candidates:', candidatesData);
+      console.log('Loaded all candidates:', candidatesData);
       setCandidates(candidatesData || []);
     } catch (error) {
       console.error('Error loading candidates:', error);
@@ -405,8 +354,46 @@ const ClerkDashboard = () => {
 
       console.log('Filtered vote tallies:', filteredTallies);
 
-      // Group candidates by position
-      const candidatesByPosition = candidates.reduce((acc, candidate) => {
+      // Filter candidates to show based on location selection - match voter page logic
+      let filteredCandidates = candidates;
+      
+      if (location.county !== 'all') {
+        // Apply location-based filtering similar to voter page
+        filteredCandidates = candidates.filter(candidate => {
+          // Always include presidential candidates
+          if (candidate.position_id === 'president') return true;
+          
+          // County level positions (governor, women_rep)
+          if (candidate.position_id === 'governor' || candidate.position_id === 'women_rep') {
+            return candidate.location_id === location.county.toLowerCase();
+          }
+          
+          // Constituency level positions (mp)
+          if (candidate.position_id === 'mp') {
+            if (location.constituency === 'all') return false; // Don't show MPs if no constituency selected
+            const constituency = location.constituency.toLowerCase();
+            return candidate.location_id === constituency || 
+                   candidate.location_id === constituency.replace(' ', '') ||
+                   candidate.location_id === 'kiambutown'; // Specific mapping for Juja->KiambuTown
+          }
+          
+          // Ward level positions (mca)
+          if (candidate.position_id === 'mca') {
+            if (location.ward === 'all') return false; // Don't show MCAs if no ward selected
+            const ward = location.ward.toLowerCase();
+            return candidate.location_id === ward || 
+                   candidate.location_id === ward.replace(' ', '') ||
+                   candidate.location_id === 'ward-0547'; // Map Murera to database ID
+          }
+          
+          return false;
+        });
+      }
+
+      console.log('Filtered candidates based on location:', filteredCandidates);
+
+      // Group filtered candidates by position
+      const candidatesByPosition = filteredCandidates.reduce((acc, candidate) => {
         if (!acc[candidate.position_id]) {
           acc[candidate.position_id] = [];
         }
@@ -414,7 +401,7 @@ const ClerkDashboard = () => {
         return acc;
       }, {} as Record<string, ElectionCandidate[]>);
 
-      console.log('Candidates by position:', candidatesByPosition);
+      console.log('Candidates by position after filtering:', candidatesByPosition);
 
       // Process vote tallies for each position
       Object.entries(candidatesByPosition).forEach(([positionId, positionCandidates]) => {
@@ -425,14 +412,13 @@ const ClerkDashboard = () => {
         }
 
         positionCandidates.forEach((candidate) => {
-          // For national positions like President, sum votes from all locations
-          // For local positions, use filtered tallies based on location
-          let relevantTallies = filteredTallies;
+          // For presidential candidates, always show total votes from all locations
+          // For other positions, show votes relevant to the selected location
+          let relevantTallies = allVoteTallies || [];
           
-          // If this is a national position (president) and we're filtering by location,
-          // we should still show all votes for presidential candidates
-          if (position.level === 'national' && location.county !== 'all') {
-            relevantTallies = allVoteTallies || [];
+          if (positionId !== 'president' && location.county !== 'all') {
+            // For non-presidential positions, filter tallies based on location
+            relevantTallies = filteredTallies;
           }
           
           // Find ALL vote tallies for this candidate and sum them up
