@@ -147,18 +147,19 @@ const ClerkDashboard = () => {
         .from('election_candidates')
         .select('*');
 
-      // Filter candidates based on specific location level selected
+      // Hierarchical candidate filtering based on location selection
       console.log('Location selection:', location);
       
       if (location.county === 'all') {
         // Show only presidential candidates when no location is specified
         query = query.eq('position_id', 'president');
       } else if (location.constituency === 'all') {
-        // County level selected: show governor and women rep for this county only
+        // County level selected: show presidential + governor and women rep for this county
         const countyId = location.county.toLowerCase().replace(/\s+/g, '');
-        query = query.in('position_id', ['governor', 'women_rep']).eq('location_id', countyId);
+        query = query.or(`position_id.eq.president,and(position_id.in.(governor,women_rep),location_id.eq.${countyId})`);
       } else if (location.ward === 'all') {
-        // Constituency level selected: show MP candidates for this constituency only
+        // Constituency level selected: show presidential + county candidates + MP for this constituency
+        const countyId = location.county.toLowerCase().replace(/\s+/g, '');
         const constituencyMap: Record<string, string> = {
           'westlands': 'westlands',
           'kiambu town': 'kiambutown',
@@ -170,9 +171,21 @@ const ClerkDashboard = () => {
           'mvita': 'mvita'
         };
         const constituencyId = constituencyMap[location.constituency.toLowerCase()] || location.constituency.toLowerCase().replace(/\s+/g, '');
-        query = query.eq('position_id', 'mp').eq('location_id', constituencyId);
+        query = query.or(`position_id.eq.president,and(position_id.in.(governor,women_rep),location_id.eq.${countyId}),and(position_id.eq.mp,location_id.eq.${constituencyId})`);
       } else {
-        // Ward level selected: show MCA candidates for this ward only
+        // Ward level selected: show presidential + county candidates + constituency MP + ward MCA
+        const countyId = location.county.toLowerCase().replace(/\s+/g, '');
+        const constituencyMap: Record<string, string> = {
+          'westlands': 'westlands',
+          'kiambu town': 'kiambutown',
+          'thika town': 'thikatown',
+          'juja': 'juja',
+          'machakos town': 'machakostwon',
+          'nakuru town east': 'nakurutowneast',
+          'kisumu east': 'kisumueast',
+          'mvita': 'mvita'
+        };
+        const constituencyId = constituencyMap[location.constituency.toLowerCase()] || location.constituency.toLowerCase().replace(/\s+/g, '');
         const wardMap: Record<string, string> = {
           'parklands': 'parklands',
           'township': 'township',
@@ -182,7 +195,7 @@ const ClerkDashboard = () => {
           'murera': 'ward-0547' // Map Murera to its database ID
         };
         const wardId = wardMap[location.ward.toLowerCase()] || location.ward.toLowerCase().replace(/\s+/g, '');
-        query = query.eq('position_id', 'mca').eq('location_id', wardId);
+        query = query.or(`position_id.eq.president,and(position_id.in.(governor,women_rep),location_id.eq.${countyId}),and(position_id.eq.mp,location_id.eq.${constituencyId}),and(position_id.eq.mca,location_id.eq.${wardId})`);
       }
 
       const { data: candidatesData, error } = await query;
