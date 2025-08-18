@@ -141,7 +141,7 @@ const ClerkDashboard = () => {
 
   const loadCandidates = async () => {
     try {
-      console.log('Loading candidates with location filtering like voter page');
+      console.log('Loading candidates with EXACT same logic as voter page');
       
       // Load ALL candidates from database first
       const { data: candidatesData, error } = await supabase
@@ -154,7 +154,7 @@ const ClerkDashboard = () => {
         return;
       }
 
-      // Apply same filtering logic as voter page
+      // Apply EXACT same filtering logic as VoterCandidatesPage
       let filteredCandidates = candidatesData || [];
       
       if (location.county === 'all') {
@@ -163,7 +163,7 @@ const ClerkDashboard = () => {
           candidate.position_id === 'president'
         ) || [];
       } else {
-        // Filter candidates based on location selection - match voter page logic
+        // Filter candidates based on location selection - EXACT match to voter page logic
         filteredCandidates = candidatesData?.filter(candidate => {
           // Always include presidential candidates
           if (candidate.position_id === 'president') return true;
@@ -173,29 +173,30 @@ const ClerkDashboard = () => {
             return candidate.location_id === location.county.toLowerCase();
           }
           
-          // Constituency level positions (mp) - only show if constituency is selected
+          // Constituency level positions (mp)
           if (candidate.position_id === 'mp') {
+            // For constituency level, only show if constituency is selected
             if (location.constituency === 'all') return false;
             const constituency = location.constituency.toLowerCase();
             return candidate.location_id === constituency || 
                    candidate.location_id === constituency.replace(' ', '') ||
-                   candidate.location_id === 'kiambutown'; // Specific mapping
+                   candidate.location_id === 'kiambutown'; // Specific mapping for Juja->KiambuTown
           }
           
-          // Ward level positions (mca) - only show if ward is selected
+          // Ward level positions (mca)
           if (candidate.position_id === 'mca') {
+            // For ward level, only show if ward is selected
             if (location.ward === 'all') return false;
             const ward = location.ward.toLowerCase();
             return candidate.location_id === ward || 
-                   candidate.location_id === ward.replace(' ', '') ||
-                   candidate.location_id === 'ward-0547'; // Map Murera to database ID
+                   candidate.location_id === ward.replace(' ', '');
           }
           
           return false;
         }) || [];
       }
 
-      console.log('Filtered candidates matching voter page logic:', filteredCandidates);
+      console.log('Filtered candidates with EXACT voter page logic:', filteredCandidates);
       setCandidates(filteredCandidates);
     } catch (error) {
       console.error('Error loading candidates:', error);
