@@ -406,8 +406,15 @@ const ClerkDashboard = () => {
 
       console.log('Candidates by position after filtering:', candidatesByPosition);
 
-      // Process vote tallies for each position
-      Object.entries(candidatesByPosition).forEach(([positionId, positionCandidates]) => {
+      // Define position order: President, Governor, Women Rep, MP, MCA
+      const positionOrder = ['president', 'governor', 'women_rep', 'mp', 'mca'];
+      
+      // Sort positions according to the desired order
+      const sortedPositions = positionOrder.filter(posId => candidatesByPosition[posId]);
+      
+      // Process vote tallies for each position in the correct order
+      sortedPositions.forEach((positionId) => {
+        const positionCandidates = candidatesByPosition[positionId];
         const position = positions.find(p => p.id === positionId);
         if (!position) {
           console.log('No position found for ID:', positionId);
