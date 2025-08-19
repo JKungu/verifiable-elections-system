@@ -135,29 +135,69 @@ const VoterCandidatesPage = () => {
         })) || [];
 
         // Filter candidates based on voter's location
+        console.log('Voter location:', location);
+        console.log('All candidates:', transformedCandidates);
+        
         const filteredCandidates = transformedCandidates.filter(candidate => {
-          // Always include presidential candidates
+          // Always include presidential candidates (national level)
           if (candidate.position.id === '1') return true;
           
           // County level positions (governor, women_rep)
           if (candidate.position.id === '2' || candidate.position.id === '3') {
-            return candidate.location_id === location.county.name.toLowerCase();
+            const voterCounty = location.county.name.toLowerCase();
+            const candidateLocation = candidate.location_id?.toLowerCase();
+            
+            // Enhanced county matching
+            const countyMatches = candidateLocation === voterCounty || 
+                                candidateLocation === voterCounty.replace(' ', '') ||
+                                candidateLocation === voterCounty.replace(' county', '') ||
+                                // Specific mappings
+                                (voterCounty.includes('kiambu') && candidateLocation === 'kiambu') ||
+                                (voterCounty.includes('nairobi') && candidateLocation === 'nairobi') ||
+                                (voterCounty.includes('mombasa') && candidateLocation === 'mombasa') ||
+                                (voterCounty.includes('nakuru') && candidateLocation === 'nakuru') ||
+                                (voterCounty.includes('kisumu') && candidateLocation === 'kisumu');
+            
+            console.log(`County check for ${candidate.name}: voter=${voterCounty}, candidate=${candidateLocation}, matches=${countyMatches}`);
+            return countyMatches;
           }
           
           // Constituency level positions (mp)
           if (candidate.position.id === '4') {
-            // For Juja constituency, match with "kiambutown" or similar
             const constituency = location.subcounty.name.toLowerCase();
-            return candidate.location_id === constituency || 
-                   candidate.location_id === constituency.replace(' ', '') ||
-                   candidate.location_id === 'kiambutown'; // Specific mapping for Juja->KiambuTown
+            const candidateLocation = candidate.location_id?.toLowerCase();
+            
+            const constituencyMatches = candidateLocation === constituency || 
+                                      candidateLocation === constituency.replace(' ', '') ||
+                                      // Specific mappings
+                                      (constituency.includes('juja') && candidateLocation === 'kiambutown') ||
+                                      (constituency.includes('westlands') && candidateLocation === 'westlands') ||
+                                      (constituency.includes('mvita') && candidateLocation === 'mvita') ||
+                                      (constituency.includes('nakuru') && candidateLocation === 'nakurutowneast') ||
+                                      (constituency.includes('kisumu') && candidateLocation === 'kisumueast');
+            
+            console.log(`Constituency check for ${candidate.name}: voter=${constituency}, candidate=${candidateLocation}, matches=${constituencyMatches}`);
+            return constituencyMatches;
           }
           
           // Ward level positions (mca)
           if (candidate.position.id === '5') {
             const ward = location.ward.name.toLowerCase();
-            return candidate.location_id === ward || 
-                   candidate.location_id === ward.replace(' ', '');
+            const candidateLocation = candidate.location_id?.toLowerCase();
+            
+            const wardMatches = candidateLocation === ward || 
+                              candidateLocation === ward.replace(' ', '') ||
+                              candidateLocation === ward.replace(' ward', '') ||
+                              // Specific mappings for common ward variations
+                              (ward.includes('biashara') && candidateLocation === 'biashara') ||
+                              (ward.includes('murera') && candidateLocation === 'murera') ||
+                              (ward.includes('parklands') && candidateLocation === 'parklands') ||
+                              (ward.includes('township') && candidateLocation === 'township') ||
+                              (ward.includes('majengo') && candidateLocation === 'majengo') ||
+                              (ward.includes('kolwa') && candidateLocation === 'kolwacentral');
+            
+            console.log(`Ward check for ${candidate.name}: voter=${ward}, candidate=${candidateLocation}, matches=${wardMatches}`);
+            return wardMatches;
           }
           
           return false;
