@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -579,23 +579,23 @@ export type Database = {
       cast_or_update_vote: {
         Args: {
           p_citizen_id: string
+          p_device_fingerprint?: string
           p_election_id: string
           p_encrypted_vote: string
-          p_vote_hash: string
           p_ip_address?: unknown
           p_user_agent?: string
-          p_device_fingerprint?: string
+          p_vote_hash: string
         }
         Returns: string
       }
       create_audit_log: {
         Args: {
           p_action: Database["public"]["Enums"]["audit_action"]
-          p_entity_type: string
-          p_entity_id?: string
           p_citizen_id?: string
-          p_election_id?: string
           p_details?: Json
+          p_election_id?: string
+          p_entity_id?: string
+          p_entity_type: string
           p_ip_address?: unknown
           p_user_agent?: string
         }
