@@ -196,6 +196,9 @@ const VoterCandidatesPage = () => {
                               candidateLocation === ward.replace(' ward', '') ||
                               // Direct location ID matching for numbered wards
                               candidateLocation === voterLocationId ||
+                              // Enhanced ward matching for numbered wards
+                              (voterLocationId?.includes('ward-055') && candidateLocation?.includes('ward-055')) ||
+                              (voterLocationId?.includes('ward-054') && candidateLocation?.includes('ward-054')) ||
                               // Specific mappings for common ward variations
                               (ward.includes('biashara') && candidateLocation === 'biashara') ||
                               (ward.includes('murera') && candidateLocation === 'murera') ||
