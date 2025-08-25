@@ -166,9 +166,14 @@ const VoterCandidatesPage = () => {
           if (candidate.position.id === '4') {
             const constituency = location.subcounty.name.toLowerCase();
             const candidateLocation = candidate.location_id?.toLowerCase();
+            const voterLocationId = location.location_id?.toLowerCase();
             
             const constituencyMatches = candidateLocation === constituency || 
                                       candidateLocation === constituency.replace(' ', '') ||
+                                      // Ward-based constituency mapping
+                                      (voterLocationId === 'ward-0552' && candidateLocation === 'constituency-552') ||
+                                      (voterLocationId === 'ward-0558' && candidateLocation === 'constituency-558') ||
+                                      (voterLocationId === 'ward-0547' && candidateLocation === 'westlands') ||
                                       // Specific mappings
                                       (constituency.includes('juja') && candidateLocation === 'kiambutown') ||
                                       (constituency.includes('westlands') && candidateLocation === 'westlands') ||
@@ -184,10 +189,13 @@ const VoterCandidatesPage = () => {
           if (candidate.position.id === '5') {
             const ward = location.ward.name.toLowerCase();
             const candidateLocation = candidate.location_id?.toLowerCase();
+            const voterLocationId = location.location_id?.toLowerCase();
             
             const wardMatches = candidateLocation === ward || 
                               candidateLocation === ward.replace(' ', '') ||
                               candidateLocation === ward.replace(' ward', '') ||
+                              // Direct location ID matching for numbered wards
+                              candidateLocation === voterLocationId ||
                               // Specific mappings for common ward variations
                               (ward.includes('biashara') && candidateLocation === 'biashara') ||
                               (ward.includes('murera') && candidateLocation === 'murera') ||
@@ -196,7 +204,7 @@ const VoterCandidatesPage = () => {
                               (ward.includes('majengo') && candidateLocation === 'majengo') ||
                               (ward.includes('kolwa') && candidateLocation === 'kolwacentral');
             
-            console.log(`Ward check for ${candidate.name}: voter=${ward}, candidate=${candidateLocation}, matches=${wardMatches}`);
+            console.log(`Ward check for ${candidate.name}: voter=${ward}, candidate=${candidateLocation}, voterLocationId=${voterLocationId}, matches=${wardMatches}`);
             return wardMatches;
           }
           
