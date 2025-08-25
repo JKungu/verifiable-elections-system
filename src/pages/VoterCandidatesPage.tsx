@@ -170,9 +170,9 @@ const VoterCandidatesPage = () => {
             
             const constituencyMatches = candidateLocation === constituency || 
                                       candidateLocation === constituency.replace(' ', '') ||
-                                      // Ward-based constituency mapping
-                                      (voterLocationId === 'ward-0552' && candidateLocation === 'constituency-552') ||
-                                      (voterLocationId === 'ward-0558' && candidateLocation === 'constituency-558') ||
+                                      // Ward-based constituency mapping - improved
+                                      (voterLocationId === 'ward-0552' && candidateLocation === 'kiambutown') ||
+                                      (voterLocationId === 'ward-0558' && candidateLocation === 'westlands') ||
                                       (voterLocationId === 'ward-0547' && candidateLocation === 'westlands') ||
                                       // Specific mappings
                                       (constituency.includes('juja') && candidateLocation === 'kiambutown') ||
