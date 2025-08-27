@@ -207,6 +207,11 @@ const ClerkDashboard = () => {
   useEffect(() => {
     console.log('Setting up real-time subscriptions...');
     
+    // Load initial data
+    loadVoteTallies();
+    loadVoterData();
+    loadVoteData();
+    
     const votesChannel = supabase
       .channel('votes-realtime')
       .on(
@@ -229,7 +234,12 @@ const ClerkDashboard = () => {
       )
       .subscribe((status) => {
         console.log('Votes subscription status:', status);
-        setIsRealTimeConnected(status === 'SUBSCRIBED');
+        if (status === 'SUBSCRIBED') {
+          setIsRealTimeConnected(true);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('Votes subscription failed, continuing without real-time updates');
+          setIsRealTimeConnected(false);
+        }
       });
 
     const votersChannel = supabase
@@ -254,7 +264,9 @@ const ClerkDashboard = () => {
           loadVoteData();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Voters subscription status:', status);
+      });
 
     const talliesChannel = supabase
       .channel('tallies-realtime')
@@ -271,14 +283,9 @@ const ClerkDashboard = () => {
           loadVoteData(); // Refresh vote data display
         }
       )
-      .subscribe();
-
-    if (isRealTimeConnected) {
-      toast({
-        title: "Real-time Connected",
-        description: "Live updates are now active for votes and voters",
+      .subscribe((status) => {
+        console.log('Tallies subscription status:', status);
       });
-    }
 
     return () => {
       console.log('Cleaning up real-time subscriptions');
