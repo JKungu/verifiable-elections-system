@@ -91,18 +91,10 @@ const ClerkDashboard = () => {
   };
 
   useEffect(() => {
-    // Load clerk data
-    const storedClerkData = localStorage.getItem('clerkData');
-    if (!storedClerkData) {
-      navigate('/clerk-login');
-      return;
-    }
-    setClerkData(JSON.parse(storedClerkData));
-    
     // Load positions and initial data
     loadPositions();
     loadVoteTallies();
-  }, [navigate]);
+  }, []);
 
   const loadPositions = async () => {
     try {

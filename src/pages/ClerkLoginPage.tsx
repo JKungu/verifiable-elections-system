@@ -8,91 +8,51 @@ import { Label } from '@/components/ui/label';
 import { Shield, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { z } from 'zod';
+
+const clerkLoginSchema = z.object({
+  nationalId: z.string().trim().min(1, "National ID is required").max(50),
+  password: z.string().min(6, "Password must be at least 6 characters")
+});
 
 const ClerkLoginPage = () => {
-  const [formData, setFormData] = useState({
-    registrationNumber: '',
-    name: '',
-    phoneNumber: '',
-    idNumber: ''
-  });
+  const [nationalId, setNationalId] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
+  const { signIn, citizen } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // Validate all fields are filled
-      if (!formData.registrationNumber || !formData.name || !formData.phoneNumber || !formData.idNumber) {
+      // Validate input
+      const validation = clerkLoginSchema.safeParse({ nationalId, password });
+      if (!validation.success) {
         toast({
-          title: "Missing Information",
-          description: "Please fill in all required fields.",
+          title: "Validation Error",
+          description: validation.error.errors[0].message,
           variant: "destructive",
         });
         return;
       }
 
-      // Check if clerk exists in the database
-      const { data: existingClerk, error: fetchError } = await supabase
-        .from('citizens')
-        .select('*')
-        .eq('national_id', formData.idNumber)
-        .eq('user_role', 'election_authority')
-        .maybeSingle();
-
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Error checking clerk:', fetchError);
-        toast({
-          title: "Database Error", 
-          description: "Failed to verify clerk credentials.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // If clerk doesn't exist, we'll create a simple session without database insertion
-      // In a real system, clerk records would be pre-registered by system administrators
-      if (!existingClerk) {
-        console.log('Clerk not found in database, creating temporary session');
-        
-        // For this demo, we'll allow the clerk to login without database verification
-        // In production, all clerks should be pre-registered in the system
-        toast({
-          title: "Login Successful",
-          description: "Welcome to the clerk portal! (Demo mode)",
-        });
-      } else {
-        toast({
-          title: "Login Successful",
-          description: "Welcome back to the clerk portal!",
-        });
-      }
-
-      // Store clerk data in localStorage for session management
-      localStorage.setItem('clerkData', JSON.stringify(formData));
+      // Sign in with Supabase Auth
+      await signIn(nationalId, password);
       
-      // Log the clerk login activity
-      console.log('Clerk logged in:', formData.registrationNumber);
+      toast({
+        title: "Login Successful",
+        description: "Welcome to the clerk portal!",
+      });
 
-      // Navigate to clerk dashboard
       navigate('/clerk-dashboard');
-    } catch (error) {
-      console.error('Login error:', error);
+    } catch (error: any) {
       toast({
         title: "Login Failed",
-        description: "Please check your information and try again.",
+        description: error.message || "Invalid credentials. Please check your National ID and password.",
         variant: "destructive",
       });
     } finally {
@@ -132,53 +92,25 @@ const ClerkLoginPage = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="registrationNumber">Registration Number</Label>
+              <Label htmlFor="nationalId">National ID</Label>
               <Input
-                id="registrationNumber"
-                name="registrationNumber"
+                id="nationalId"
                 type="text"
-                placeholder="Enter your registration number"
-                value={formData.registrationNumber}
-                onChange={handleInputChange}
+                placeholder="Enter your national ID"
+                value={nationalId}
+                onChange={(e) => setNationalId(e.target.value)}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="password">Password</Label>
               <Input
-                id="name"
-                name="name"
-                type="text"
-                placeholder="Enter your full name"
-                value={formData.name}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phoneNumber">Phone Number</Label>
-              <Input
-                id="phoneNumber"
-                name="phoneNumber"
-                type="tel"
-                placeholder="Enter your phone number"
-                value={formData.phoneNumber}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="idNumber">ID Number</Label>
-              <Input
-                id="idNumber"
-                name="idNumber"
-                type="text"
-                placeholder="Enter your ID number"
-                value={formData.idNumber}
-                onChange={handleInputChange}
+                id="password"
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 required
               />
             </div>

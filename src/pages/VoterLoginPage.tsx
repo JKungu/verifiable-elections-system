@@ -8,6 +8,14 @@ import { Label } from '@/components/ui/label';
 import { User, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { z } from 'zod';
+
+const voterSchema = z.object({
+  idNumber: z.string().length(8, "ID must be 8 digits").regex(/^\d+$/, "ID must contain only numbers"),
+  firstName: z.string().trim().min(1, "First name required").max(50).regex(/^[a-zA-Z\s]+$/, "Only letters allowed"),
+  lastName: z.string().trim().min(1, "Last name required").max(50).regex(/^[a-zA-Z\s]+$/, "Only letters allowed"),
+  phoneNumber: z.string().regex(/^\+?[0-9]{10,15}$/, "Invalid phone number")
+});
 
 const VoterLoginPage = () => {
   const [formData, setFormData] = useState({
@@ -30,26 +38,21 @@ const VoterLoginPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.idNumber || !formData.firstName || !formData.lastName || !formData.phoneNumber) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsLoading(true);
 
     try {
-      // Simple validation for ID number (should be 8 digits)
-      if (formData.idNumber.length !== 8 || !/^\d+$/.test(formData.idNumber)) {
-        throw new Error('ID number must be exactly 8 digits');
+      // Validate input
+      const validation = voterSchema.safeParse(formData);
+      if (!validation.success) {
+        toast({
+          title: "Validation Error",
+          description: validation.error.errors[0].message,
+          variant: "destructive",
+        });
+        return;
       }
 
-      // For now, we'll just store the voter data in localStorage
-      // The database integration will be handled once the types are updated
+      // Store voter session data (not authentication - this is for voting session only)
       const voterData = {
         idNumber: formData.idNumber,
         firstName: formData.firstName,

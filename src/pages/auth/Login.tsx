@@ -9,6 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Shield } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { z } from 'zod';
+
+const loginSchema = z.object({
+  nationalId: z.string().trim().min(1, "National ID is required").max(50),
+  password: z.string().min(6, "Password must be at least 6 characters")
+});
 
 const Login = () => {
   const [nationalId, setNationalId] = useState('');
@@ -27,6 +33,13 @@ const Login = () => {
     setError('');
 
     try {
+      // Validate input
+      const validation = loginSchema.safeParse({ nationalId, password });
+      if (!validation.success) {
+        setError(validation.error.errors[0].message);
+        return;
+      }
+
       await signIn(nationalId, password);
       toast({
         title: "Welcome back!",

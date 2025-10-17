@@ -9,6 +9,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { z } from 'zod';
+
+const registerSchema = z.object({
+  firstName: z.string().trim().min(1, "First name is required").max(50).regex(/^[a-zA-Z\s]+$/, "Only letters allowed"),
+  lastName: z.string().trim().min(1, "Last name is required").max(50).regex(/^[a-zA-Z\s]+$/, "Only letters allowed"),
+  nationalId: z.string().trim().min(1, "National ID is required").max(50),
+  email: z.string().trim().email("Invalid email address").max(255),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string(),
+  dateOfBirth: z.string().min(1, "Date of birth is required"),
+  phoneNumber: z.string().regex(/^\+?[0-9]{10,15}$/, "Invalid phone number").optional().or(z.literal(''))
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -41,13 +56,14 @@ const Register = () => {
     setLoading(true);
     setError('');
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      setLoading(false);
-      return;
-    }
-
     try {
+      // Validate input
+      const validation = registerSchema.safeParse(formData);
+      if (!validation.success) {
+        setError(validation.error.errors[0].message);
+        return;
+      }
+
       await signUp({
         nationalId: formData.nationalId,
         email: formData.email,
