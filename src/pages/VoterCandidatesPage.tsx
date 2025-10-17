@@ -9,6 +9,17 @@ import { Vote, CheckCircle, LogOut, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { z } from 'zod';
+
+// Input validation schema for vote submission
+const voteSchema = z.object({
+  position_id: z.string().trim().min(1).max(50),
+  candidate_id: z.string().trim().min(1).max(50)
+});
+
+const voteBatchSchema = z.object({
+  votes: z.array(voteSchema).min(1).max(20)
+});
 
 interface Candidate {
   id: string;
@@ -340,14 +351,19 @@ const VoterCandidatesPage = () => {
 
       console.log('Voter record created/updated:', voterRecord);
 
-      // Insert votes for each position
+      // Prepare anonymous votes (no voter_id for ballot secrecy)
       const votesToInsert = Object.entries(selectedCandidates).map(([positionId, candidateId]) => ({
-        voter_id: voterRecord.id,
         position_id: positionId,
         candidate_id: candidateId
       }));
 
-      console.log('Inserting votes:', votesToInsert);
+      // Validate vote data before submission
+      const validation = voteBatchSchema.safeParse({ votes: votesToInsert });
+      if (!validation.success) {
+        throw new Error(`Invalid vote data: ${validation.error.errors[0].message}`);
+      }
+
+      console.log('Inserting anonymous votes:', votesToInsert);
 
       const { error: votesError } = await supabase
         .from('votes')

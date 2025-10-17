@@ -7,6 +7,17 @@ import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Vote, ArrowLeft, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { z } from 'zod';
+
+// Input validation schema for vote submission
+const voteSchema = z.object({
+  position_id: z.string().trim().min(1).max(50),
+  candidate_id: z.string().trim().min(1).max(50)
+});
+
+const voteBatchSchema = z.object({
+  votes: z.array(voteSchema).min(1).max(20)
+});
 
 interface Candidate {
   id: string;
@@ -248,8 +259,8 @@ const VotingPage = () => {
 
       console.log('✅ Voter created:', newVoter);
 
-      // PHASE 2: PREPARE VOTE BATCH WITH VALIDATION
-      console.log('PHASE 2: Preparing vote batch...');
+      // PHASE 2: PREPARE ANONYMOUS VOTE BATCH WITH VALIDATION
+      console.log('PHASE 2: Preparing anonymous vote batch...');
       
       const voteBatch = [];
       for (const [positionId, candidateId] of Object.entries(selections)) {
@@ -257,8 +268,8 @@ const VotingPage = () => {
           throw new Error(`Invalid vote data: position=${positionId}, candidate=${candidateId}`);
         }
 
+        // Anonymous vote - no voter_id for ballot secrecy
         const voteRecord = {
-          voter_id: newVoter.id,
           position_id: positionId,
           candidate_id: candidateId
         };
@@ -271,7 +282,13 @@ const VotingPage = () => {
         throw new Error(`Vote count mismatch: expected ${positions.length}, prepared ${voteBatch.length}`);
       }
 
-      console.log('✅ Vote batch prepared:', voteBatch);
+      // Validate vote batch with Zod schema
+      const validation = voteBatchSchema.safeParse({ votes: voteBatch });
+      if (!validation.success) {
+        throw new Error(`Vote validation failed: ${validation.error.errors[0].message}`);
+      }
+
+      console.log('✅ Anonymous vote batch prepared and validated:', voteBatch);
 
       // PHASE 3: EXECUTE ATOMIC VOTE INSERTION
       console.log('PHASE 3: Executing atomic vote insertion...');
