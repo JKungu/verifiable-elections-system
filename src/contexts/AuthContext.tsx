@@ -9,6 +9,7 @@ type Citizen = Tables<'citizens'>;
 interface AuthContextType {
   user: User | null;
   citizen: Citizen | null;
+  userRoles: string[];
   loading: boolean;
   signIn: (nationalId: string, password: string) => Promise<void>;
   signUp: (data: {
@@ -38,6 +39,7 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [citizen, setCitizen] = useState<Citizen | null>(null);
+  const [userRoles, setUserRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -77,6 +79,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) throw error;
       setCitizen(data);
+
+      // Fetch user roles from secure user_roles table
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId);
+
+      if (rolesError) {
+        console.error('Error fetching user roles:', rolesError);
+        setUserRoles([]);
+      } else {
+        setUserRoles(rolesData?.map(r => r.role) || []);
+      }
     } catch (error) {
       console.error('Error fetching citizen data:', error);
     } finally {
@@ -144,12 +159,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) throw error;
   };
 
-  const isElectionAuthority = citizen?.user_role === 'election_authority';
-  const isSystemAuditor = citizen?.user_role === 'system_auditor';
+  const isElectionAuthority = userRoles.includes('election_authority');
+  const isSystemAuditor = userRoles.includes('system_auditor');
 
   const value = {
     user,
     citizen,
+    userRoles,
     loading,
     signIn,
     signUp,

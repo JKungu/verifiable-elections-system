@@ -14,7 +14,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children, 
   requiredRole 
 }) => {
-  const { user, citizen, loading } = useAuth();
+  const { user, citizen, userRoles, loading } = useAuth();
 
   if (loading) {
     return (
@@ -28,7 +28,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRole && citizen.user_role !== requiredRole) {
+  if (requiredRole && !userRoles.includes(requiredRole)) {
     return <Navigate to="/dashboard" replace />;
   }
 
