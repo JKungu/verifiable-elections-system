@@ -84,12 +84,48 @@ const VoterCandidatesPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [voterLocation, setVoterLocation] = useState<any>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
     const loadCandidatesAndPositions = async () => {
       try {
+        // Check authentication first
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          toast({
+            title: "Session Expired",
+            description: "Please login again to continue.",
+            variant: "destructive",
+          });
+          navigate('/voter-login');
+          return;
+        }
+
+        setUserId(session.user.id);
+
+        // Check if voter has already voted
+        const { data: eligibility } = await supabase
+          .rpc('check_voter_eligibility', { _auth_id: session.user.id });
+
+        if (eligibility && eligibility.length > 0) {
+          const status = eligibility[0];
+          if (!status.eligible) {
+            toast({
+              title: "Not Eligible",
+              description: status.reason === 'Already voted' 
+                ? "You have already cast your vote in this election."
+                : status.reason,
+              variant: "destructive",
+            });
+            await supabase.auth.signOut();
+            navigate('/voter-login');
+            return;
+          }
+        }
+
         const voterLocationData = localStorage.getItem('voterLocation');
         if (!voterLocationData) {
           navigate('/voter-location');
@@ -249,16 +285,15 @@ const VoterCandidatesPage = () => {
   };
 
   const handleSubmitVotes = async () => {
-    const voterData = localStorage.getItem('voterData');
-    const voterLocation = localStorage.getItem('voterLocation');
-
-    if (!voterData || !voterLocation) {
+    if (!userId) {
+      toast({
+        title: "Authentication Error",
+        description: "Please login again.",
+        variant: "destructive",
+      });
       navigate('/voter-login');
       return;
     }
-
-    const voter = JSON.parse(voterData);
-    const location = JSON.parse(voterLocation);
 
     // Check if all positions have selections
     const positionIds = positions.map(p => p.id);
@@ -280,77 +315,6 @@ const VoterCandidatesPage = () => {
     setIsSubmitting(true);
 
     try {
-      console.log('Starting vote submission process...');
-      
-      // Check if voter already exists
-      const { data: existingVoter, error: fetchError } = await supabase
-        .from('voters')
-        .select('*')
-        .eq('id_number', voter.idNumber)
-        .maybeSingle();
-
-      if (fetchError) {
-        console.error('Error fetching voter:', fetchError);
-        throw fetchError;
-      }
-
-      if (existingVoter?.has_voted) {
-        toast({
-          title: "Already Voted",
-          description: "You have already cast your vote in this election.",
-          variant: "destructive",
-        });
-        setIsSubmitting(false);
-        return;
-      }
-
-      let voterRecord;
-
-      if (existingVoter) {
-        // Update existing voter record
-        const { data: updatedVoter, error: updateError } = await supabase
-          .from('voters')
-          .update({
-            has_voted: true,
-            voted_at: new Date().toISOString(),
-            location_id: location.ward.id
-          })
-          .eq('id', existingVoter.id)
-          .select()
-          .single();
-
-        if (updateError) {
-          console.error('Error updating voter:', updateError);
-          throw updateError;
-        }
-        
-        voterRecord = updatedVoter;
-      } else {
-        // Insert new voter record
-        const { data: newVoter, error: insertError } = await supabase
-          .from('voters')
-          .insert({
-            id_number: voter.idNumber,
-            first_name: voter.firstName,
-            last_name: voter.lastName,
-            phone_number: voter.phoneNumber,
-            location_id: location.ward.id,
-            has_voted: true,
-            voted_at: new Date().toISOString()
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error('Error inserting voter:', insertError);
-          throw insertError;
-        }
-        
-        voterRecord = newVoter;
-      }
-
-      console.log('Voter record created/updated:', voterRecord);
-
       // Prepare anonymous votes (no voter_id for ballot secrecy)
       const votesToInsert = Object.entries(selectedCandidates).map(([positionId, candidateId]) => ({
         position_id: positionId,
@@ -374,6 +338,16 @@ const VoterCandidatesPage = () => {
         throw votesError;
       }
 
+      // Mark voter as voted (prevents double voting)
+      const { data: markResult, error: markError } = await supabase
+        .rpc('mark_voter_as_voted', { _auth_id: userId });
+
+      if (markError) throw markError;
+      
+      if (!markResult) {
+        throw new Error('Unable to mark vote as submitted. You may have already voted.');
+      }
+
       console.log('Votes submitted successfully');
       setShowCongratulations(true);
       
@@ -381,6 +355,14 @@ const VoterCandidatesPage = () => {
         title: "Votes Submitted",
         description: "Your votes have been successfully recorded!",
       });
+
+      // Clear location data and sign out
+      localStorage.removeItem('voterLocation');
+      
+      setTimeout(async () => {
+        await supabase.auth.signOut();
+        navigate('/vote-success');
+      }, 2000);
 
     } catch (error: any) {
       console.error('Voting error:', error);
@@ -394,14 +376,13 @@ const VoterCandidatesPage = () => {
     }
   };
 
-  const handleLogout = () => {
-    // Clear all voter data
-    localStorage.removeItem('voterData');
+  const handleLogout = async () => {
     localStorage.removeItem('voterLocation');
+    await supabase.auth.signOut();
     
     toast({
       title: "Logged Out",
-      description: "Thank you for participating in the election!",
+      description: "Thank you for your interest in the election!",
     });
     
     navigate('/');

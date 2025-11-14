@@ -9,6 +9,7 @@ import { User, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { z } from 'zod';
+import { supabase } from '@/integrations/supabase/client';
 
 const voterSchema = z.object({
   idNumber: z.string().length(8, "ID must be 8 digits").regex(/^\d+$/, "ID must contain only numbers"),
@@ -52,21 +53,77 @@ const VoterLoginPage = () => {
         return;
       }
 
-      // Store voter session data (not authentication - this is for voting session only)
-      const voterData = {
-        idNumber: formData.idNumber,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        phoneNumber: formData.phoneNumber,
-        loginTime: new Date().toISOString()
-      };
+      // Create voter email from ID (voters don't need real email addresses)
+      const voterEmail = `voter_${formData.idNumber}@election.system`;
+      // Use ID + name as password (voters will use this to login)
+      const voterPassword = `${formData.idNumber}_${formData.firstName.toLowerCase()}`;
 
-      localStorage.setItem('voterData', JSON.stringify(voterData));
-      
-      toast({
-        title: "Login Successful",
-        description: "Please select your location to continue.",
+      // Try to sign in first (returning voter)
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: voterEmail,
+        password: voterPassword,
       });
+
+      if (signInError) {
+        // If sign in fails, register new voter
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: voterEmail,
+          password: voterPassword,
+          options: {
+            emailRedirectTo: `${window.location.origin}/voter-location`,
+            data: {
+              id_number: formData.idNumber,
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+            }
+          }
+        });
+
+        if (authError) throw authError;
+        if (!authData.user) throw new Error('Failed to create voter account');
+
+        // Create voter record linked to auth
+        const { error: voterError } = await supabase
+          .from('voters')
+          .insert({
+            auth_id: authData.user.id,
+            id_number: formData.idNumber,
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            phone_number: formData.phoneNumber,
+          });
+
+        if (voterError) throw voterError;
+
+        toast({
+          title: "Registration Successful",
+          description: "Your voter account has been created. Please select your location.",
+        });
+      } else {
+        // Returning voter - check if already voted
+        const { data: eligibility } = await supabase
+          .rpc('check_voter_eligibility', { _auth_id: signInData.user.id });
+
+        if (eligibility && eligibility.length > 0) {
+          const status = eligibility[0];
+          if (!status.eligible) {
+            toast({
+              title: "Not Eligible",
+              description: status.reason === 'Already voted' 
+                ? "You have already cast your vote in this election."
+                : status.reason,
+              variant: "destructive",
+            });
+            await supabase.auth.signOut();
+            return;
+          }
+        }
+
+        toast({
+          title: "Welcome Back",
+          description: "Please select your location to continue voting.",
+        });
+      }
 
       navigate('/voter-location');
     } catch (error: any) {
