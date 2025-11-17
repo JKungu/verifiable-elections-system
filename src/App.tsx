@@ -19,6 +19,7 @@ import VoteSuccessPage from "./pages/VoteSuccessPage";
 import ClerkLoginPage from "./pages/ClerkLoginPage";
 import ClerkDashboard from "./pages/ClerkDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import SmsAdminDashboard from "./pages/SmsAdminDashboard";
 import VoteVerificationPage from "./pages/VoteVerificationPage";
 import NotFound from "./pages/NotFound";
 
@@ -54,6 +55,11 @@ const App = () => (
                 <Route path="/admin-dashboard" element={
                   <ProtectedRoute requiredRole="system_auditor">
                     <AdminDashboard />
+                  </ProtectedRoute>
+                } />
+                <Route path="/sms-admin" element={
+                  <ProtectedRoute requiredRole="election_authority">
+                    <SmsAdminDashboard />
                   </ProtectedRoute>
                 } />
                 <Route path="/vote-verification" element={<VoteVerificationPage />} />

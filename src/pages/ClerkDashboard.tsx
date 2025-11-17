@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { MapPin, LogOut, Shield, Download, Radio, Users, Vote, BarChart3, TrendingUp } from 'lucide-react';
+import { MapPin, LogOut, Shield, Download, Radio, Users, Vote, BarChart3, TrendingUp, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { COUNTIES } from '@/data/kenyaLocations';
@@ -668,6 +668,10 @@ const ClerkDashboard = () => {
                 </div>
               </div>
               <div className="flex space-x-2">
+                <Button onClick={() => navigate('/sms-admin')} variant="outline" className="border-gray-600 text-gray-200 hover:bg-gray-800">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  SMS Dashboard
+                </Button>
                 {voteData.length > 0 && (
                   <Button onClick={exportData} variant="outline" className="border-gray-600 text-gray-200 hover:bg-gray-800">
                     <Download className="h-4 w-4 mr-2" />
