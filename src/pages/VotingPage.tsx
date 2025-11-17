@@ -235,29 +235,32 @@ const VotingPage = () => {
     console.log('=== STARTING BULLETPROOF VOTE SUBMISSION ===');
 
     try {
-      // PHASE 1: Create or update voter record
-      console.log('PHASE 1: Creating/updating voter record...');
+      // PHASE 1: Update voter record to mark as voted
+      console.log('PHASE 1: Updating voter record...');
       
-      const { data: newVoter, error: voterError } = await supabase
+      // Get authenticated user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('Not authenticated. Please login again.');
+      }
+
+      // Update existing voter record
+      const { data: updatedVoter, error: voterError } = await supabase
         .from('voters')
-        .insert({
-          id_number: voterData.idNumber,
-          first_name: voterData.firstName,
-          last_name: voterData.lastName,
-          phone_number: voterData.phoneNumber,
-          location_id: voterData.location_id || 'default',
+        .update({
           has_voted: true,
           voted_at: new Date().toISOString()
         })
+        .eq('auth_id', user.id)
         .select()
         .single();
 
       if (voterError) {
-        console.error('Voter creation failed:', voterError);
-        throw new Error(`Cannot create voter: ${voterError.message}`);
+        console.error('Voter update failed:', voterError);
+        throw new Error(`Cannot update voter: ${voterError.message}`);
       }
 
-      console.log('✅ Voter created:', newVoter);
+      console.log('✅ Voter updated:', updatedVoter);
 
       // PHASE 2: PREPARE ANONYMOUS VOTE BATCH WITH VALIDATION
       console.log('PHASE 2: Preparing anonymous vote batch...');

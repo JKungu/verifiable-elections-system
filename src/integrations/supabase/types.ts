@@ -25,7 +25,7 @@ export type Database = {
           entity_id: string | null
           entity_type: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           previous_hash: string | null
           user_agent: string | null
         }
@@ -39,7 +39,7 @@ export type Database = {
           entity_id?: string | null
           entity_type: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           previous_hash?: string | null
           user_agent?: string | null
         }
@@ -53,7 +53,7 @@ export type Database = {
           entity_id?: string | null
           entity_type?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           previous_hash?: string | null
           user_agent?: string | null
         }
@@ -81,7 +81,7 @@ export type Database = {
           election_id: string
           encrypted_vote: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           user_agent: string | null
           vote_hash: string
         }
@@ -91,7 +91,7 @@ export type Database = {
           election_id: string
           encrypted_vote: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           user_agent?: string | null
           vote_hash: string
         }
@@ -101,7 +101,7 @@ export type Database = {
           election_id?: string
           encrypted_vote?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           user_agent?: string | null
           vote_hash?: string
         }
@@ -366,6 +366,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          id: string
+          role: Database["public"]["Enums"]["user_role"]
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["user_role"]
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_sessions: {
         Row: {
           citizen_id: string
@@ -374,7 +398,7 @@ export type Database = {
           device_name: string | null
           expires_at: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           is_mobile_id: boolean | null
           last_activity: string | null
           mfa_verified: boolean | null
@@ -388,7 +412,7 @@ export type Database = {
           device_name?: string | null
           expires_at: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           is_mobile_id?: boolean | null
           last_activity?: string | null
           mfa_verified?: boolean | null
@@ -402,7 +426,7 @@ export type Database = {
           device_name?: string | null
           expires_at?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           is_mobile_id?: boolean | null
           last_activity?: string | null
           mfa_verified?: boolean | null
@@ -502,6 +526,7 @@ export type Database = {
       }
       voters: {
         Row: {
+          auth_id: string | null
           created_at: string
           first_name: string
           has_voted: boolean
@@ -514,6 +539,7 @@ export type Database = {
           voted_at: string | null
         }
         Insert: {
+          auth_id?: string | null
           created_at?: string
           first_name: string
           has_voted?: boolean
@@ -526,6 +552,7 @@ export type Database = {
           voted_at?: string | null
         }
         Update: {
+          auth_id?: string | null
           created_at?: string
           first_name?: string
           has_voted?: boolean
@@ -588,6 +615,14 @@ export type Database = {
         }
         Returns: string
       }
+      check_voter_eligibility: {
+        Args: { _auth_id: string }
+        Returns: {
+          eligible: boolean
+          reason: string
+          voter_data: Json
+        }[]
+      }
       create_audit_log: {
         Args: {
           p_action: Database["public"]["Enums"]["audit_action"]
@@ -610,21 +645,20 @@ export type Database = {
         Returns: string
       }
       get_current_citizen_role: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
-      is_election_authority: {
-        Args: Record<PropertyKey, never>
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["user_role"]
+          _user_id: string
+        }
         Returns: boolean
       }
-      is_system_auditor: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      recalculate_vote_tallies: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      is_election_authority: { Args: never; Returns: boolean }
+      is_system_auditor: { Args: never; Returns: boolean }
+      mark_voter_as_voted: { Args: { _auth_id: string }; Returns: boolean }
+      recalculate_vote_tallies: { Args: never; Returns: undefined }
     }
     Enums: {
       audit_action:
