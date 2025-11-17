@@ -64,19 +64,66 @@ const VotingPage = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Get voter data from navigation state
-    const voter = location.state?.voter;
-    if (!voter) {
-      toast({
-        title: "Access Denied",
-        description: "Please login first to access voting.",
-        variant: "destructive",
-      });
-      navigate('/voter-login');
-      return;
-    }
-    setVoterData(voter);
-    loadCandidatesForVoter(voter);
+    const checkVoterEligibility = async () => {
+      // Get voter data from navigation state
+      const voter = location.state?.voter;
+      if (!voter) {
+        toast({
+          title: "Access Denied",
+          description: "Please login first to access voting.",
+          variant: "destructive",
+        });
+        navigate('/voter-login');
+        return;
+      }
+
+      // Check if voter has already voted
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          toast({
+            title: "Authentication Error",
+            description: "Please login again.",
+            variant: "destructive",
+          });
+          navigate('/voter-login');
+          return;
+        }
+
+        const { data: voterRecord, error: voterError } = await supabase
+          .from('voters')
+          .select('has_voted, voted_at')
+          .eq('auth_id', user.id)
+          .maybeSingle();
+
+        if (voterError) {
+          console.error('Error checking voter status:', voterError);
+        }
+
+        if (voterRecord?.has_voted) {
+          toast({
+            title: "Already Voted",
+            description: "You have already cast your vote. Thank you for participating!",
+            variant: "destructive",
+          });
+          navigate('/vote-success');
+          return;
+        }
+
+        setVoterData(voter);
+        loadCandidatesForVoter(voter);
+      } catch (error) {
+        console.error('Error checking eligibility:', error);
+        toast({
+          title: "Error",
+          description: "Failed to verify voting eligibility.",
+          variant: "destructive",
+        });
+        navigate('/voter-login');
+      }
+    };
+
+    checkVoterEligibility();
   }, [location.state, navigate, toast]);
 
 
