@@ -345,6 +345,39 @@ export type Database = {
           },
         ]
       }
+      notification_templates: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          message_template: string
+          name: string
+          template_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          message_template: string
+          name: string
+          template_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          message_template?: string
+          name?: string
+          template_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       positions: {
         Row: {
           created_at: string | null
@@ -365,6 +398,53 @@ export type Database = {
           title?: string
         }
         Relationships: []
+      }
+      sms_delivery_logs: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          id: string
+          message_content: string
+          phone_number: string
+          status: string
+          template_type: string | null
+          twilio_message_sid: string | null
+          updated_at: string | null
+          voter_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_content: string
+          phone_number: string
+          status: string
+          template_type?: string | null
+          twilio_message_sid?: string | null
+          updated_at?: string | null
+          voter_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_content?: string
+          phone_number?: string
+          status?: string
+          template_type?: string | null
+          twilio_message_sid?: string | null
+          updated_at?: string | null
+          voter_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_delivery_logs_voter_id_fkey"
+            columns: ["voter_id"]
+            isOneToOne: false
+            referencedRelation: "voters"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {

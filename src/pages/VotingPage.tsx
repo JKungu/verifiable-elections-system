@@ -413,7 +413,9 @@ const VotingPage = () => {
         const { data: smsResult, error: smsError } = await supabase.functions.invoke('send-vote-sms', {
           body: {
             phoneNumber: voterData.phone_number,
-            voterName: voterData.full_name
+            voterName: voterData.full_name,
+            voterId: voterData.id,
+            templateType: 'vote_confirmation'
           }
         });
 

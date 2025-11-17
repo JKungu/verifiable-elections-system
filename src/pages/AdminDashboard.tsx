@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +13,8 @@ import {
   Settings, 
   AlertTriangle,
   CheckCircle,
-  Clock
+  Clock,
+  MessageSquare
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 const AdminDashboard = () => {
   const [electionStatus, setElectionStatus] = useState<'pending' | 'active' | 'closed'>('pending');
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Fetch election statistics
   const { data: stats, isLoading } = useQuery({
@@ -88,10 +91,16 @@ const AdminDashboard = () => {
                   <CardDescription>Election Management System</CardDescription>
                 </div>
               </div>
-              <Badge className={`${getStatusColor(electionStatus)} flex items-center space-x-2`}>
-                {getStatusIcon(electionStatus)}
-                <span className="capitalize">{electionStatus}</span>
-              </Badge>
+              <div className="flex items-center gap-4">
+                <Button onClick={() => navigate('/sms-admin')} variant="outline">
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  SMS Dashboard
+                </Button>
+                <Badge className={`${getStatusColor(electionStatus)} flex items-center space-x-2`}>
+                  {getStatusIcon(electionStatus)}
+                  <span className="capitalize">{electionStatus}</span>
+                </Badge>
+              </div>
             </div>
           </CardHeader>
         </Card>
