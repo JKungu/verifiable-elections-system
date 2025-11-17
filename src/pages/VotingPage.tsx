@@ -408,6 +408,25 @@ const VotingPage = () => {
       console.log('✅ Vote tallies updated');
       console.log('=== BULLETPROOF VOTE SUBMISSION COMPLETED ===');
 
+      // Send SMS notification
+      try {
+        const { data: smsResult, error: smsError } = await supabase.functions.invoke('send-vote-sms', {
+          body: {
+            phoneNumber: voterData.phone_number,
+            voterName: voterData.full_name
+          }
+        });
+
+        if (smsError) {
+          console.error('SMS notification failed:', smsError);
+        } else {
+          console.log('SMS notification sent:', smsResult);
+        }
+      } catch (smsError) {
+        console.error('Error sending SMS:', smsError);
+        // Don't fail the vote submission if SMS fails
+      }
+
       toast({
         title: "Vote Submitted Successfully",
         description: "Thank you for participating in the election!",
